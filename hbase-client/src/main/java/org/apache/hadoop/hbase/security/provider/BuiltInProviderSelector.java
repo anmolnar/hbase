@@ -19,11 +19,7 @@ package org.apache.hadoop.hbase.security.provider;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Collection;
-import java.util.Objects;
-
 import net.jcip.annotations.NotThreadSafe;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.security.User;
@@ -35,6 +31,9 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collection;
+import java.util.Objects;
 
 /**
  * Default implementation of {@link AuthenticationProviderSelector} which can choose from the
@@ -58,6 +57,7 @@ public class BuiltInProviderSelector implements AuthenticationProviderSelector {
   SimpleSaslClientAuthenticationProvider simpleAuth = null;
   GssSaslClientAuthenticationProvider krbAuth = null;
   DigestSaslClientAuthenticationProvider digestAuth = null;
+  OAuthBearerSaslClientAuthenticationProvider oauthBearerAuth = null;
   Text digestAuthTokenKind = null;
 
   @Override
@@ -89,6 +89,12 @@ public class BuiltInProviderSelector implements AuthenticationProviderSelector {
         }
         digestAuth = (DigestSaslClientAuthenticationProvider) provider;
         digestAuthTokenKind = new Text(digestAuth.getTokenKind());
+      } else if (OAuthBearerSaslAuthenticationProvider.SASL_AUTH_METHOD.getName().equals(name)) {
+        if (oauthBearerAuth != null) {
+          throw new IllegalStateException(
+              "Encountered multiple OAuthBearerSaslClientAuthenticationProvider instances");
+        }
+        oauthBearerAuth = (OAuthBearerSaslClientAuthenticationProvider) provider;
       } else {
         LOG.warn("Ignoring unknown SaslClientAuthenticationProvider: {}", provider.getClass());
       }
