@@ -17,93 +17,108 @@
  */
 package org.apache.hadoop.hbase.security.provider;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.security.AccessController;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.login.AppConfigurationEntry;
+import javax.security.sasl.Sasl;
+import javax.security.sasl.SaslClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.SaslUtil;
 import org.apache.hadoop.hbase.security.SecurityInfo;
 import org.apache.hadoop.hbase.security.User;
+import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.auth.SaslExtensions;
 import org.apache.hadoop.hbase.security.auth.SaslExtensionsCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerTokenCallback;
-import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.security.AccessController;
-import java.util.Map;
-import java.util.Set;
-
-import javax.security.auth.Subject;
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.UnsupportedCallbackException;
-import javax.security.sasl.Sasl;
-import javax.security.sasl.SaslClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos;
 
 @InterfaceAudience.Private
-public class OAuthBearerSaslClientAuthenticationProvider extends OAuthBearerSaslAuthenticationProvider
-  implements SaslClientAuthenticationProvider {
+public class OAuthBearerSaslClientAuthenticationProvider
+    extends OAuthBearerSaslAuthenticationProvider
+    implements SaslClientAuthenticationProvider {
 
   @Override
   public SaslClient createClient(Configuration conf, InetAddress serverAddr,
-                                 SecurityInfo securityInfo, Token<? extends TokenIdentifier> token, boolean fallbackAllowed,
+                                 SecurityInfo securityInfo, Token<? extends TokenIdentifier> token,
+                                 boolean fallbackAllowed,
                                  Map<String, String> saslProps) throws IOException {
     return Sasl.createSaslClient(new String[] { getSaslAuthMethod().getSaslMechanism() }, null,
-        null, SaslUtil.SASL_DEFAULT_REALM, saslProps, new OAuthBearerSaslClientCallbackHandler(token));
+        null, SaslUtil.SASL_DEFAULT_REALM, saslProps,
+      new OAuthBearerSaslClientCallbackHandler());
   }
 
-  public static class OAuthBearerSaslClientCallbackHandler implements CallbackHandler {
-
-    private final OAuthBearerToken token;
-
-    public OAuthBearerSaslClientCallbackHandler(Token<? extends TokenIdentifier> token) {
-      this.token = new OAuthBearerToken() {
-        @Override
-        public String value() {
-          return SaslUtil.encodeIdentifier(token.getIdentifier());
-        }
-
-        @Override
-        public Set<String> scope() {
-          return null;
-        }
-
-        @Override
-        public long lifetimeMs() {
-          return 0;
-        }
-
-        @Override
-        public String principalName() {
-          return null;
-        }
-
-        @Override
-        public Long startTimeMs() {
-          return null;
-        }
-      };
-    }
+  public static class OAuthBearerSaslClientCallbackHandler implements AuthenticateCallbackHandler {
+    private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSaslClientCallbackHandler.class);
 
     @Override
-    public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
+    public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
       for (Callback callback : callbacks) {
-        if (callback instanceof OAuthBearerTokenCallback)
+        if (callback instanceof OAuthBearerTokenCallback) {
           handleCallback((OAuthBearerTokenCallback) callback);
-        else if (callback instanceof SaslExtensionsCallback)
+        } else if (callback instanceof SaslExtensionsCallback) {
           handleCallback((SaslExtensionsCallback) callback, Subject.getSubject(AccessController.getContext()));
-        else
+        } else {
           throw new UnsupportedCallbackException(callback);
+        }
       }
     }
 
-    private void handleCallback(OAuthBearerTokenCallback callback) {
-      if (callback.token() != null)
+    private void handleCallback(OAuthBearerTokenCallback callback) throws IOException {
+      if (callback.token() != null) {
         throw new IllegalArgumentException("Callback had a token already");
-      callback.token(token);
+      }
+      Subject subject = Subject.getSubject(AccessController.getContext());
+      Set<OAuthBearerToken> privateCredentials = subject != null
+        ? subject.getPrivateCredentials(OAuthBearerToken.class)
+        : Collections.emptySet();
+      if (privateCredentials.size() == 0) {
+        throw new IOException("No OAuth Bearer tokens in Subject's private credentials");
+      }
+      if (privateCredentials.size() == 1) {
+        callback.token(privateCredentials.iterator().next());
+      } else {
+        /*
+         * There a very small window of time upon token refresh (on the order of milliseconds)
+         * where both an old and a new token appear on the Subject's private credentials.
+         * Rather than implement a lock to eliminate this window, we will deal with it by
+         * checking for the existence of multiple tokens and choosing the one that has the
+         * longest lifetime.  It is also possible that a bug could cause multiple tokens to
+         * exist (e.g. KAFKA-7902), so dealing with the unlikely possibility that occurs
+         * during normal operation also allows us to deal more robustly with potential bugs.
+         */
+        SortedSet<OAuthBearerToken> sortedByLifetime =
+          new TreeSet<>(
+            new Comparator<OAuthBearerToken>() {
+              @Override
+              public int compare(OAuthBearerToken o1, OAuthBearerToken o2) {
+                return Long.compare(o1.lifetimeMs(), o2.lifetimeMs());
+              }
+            });
+        sortedByLifetime.addAll(privateCredentials);
+        LOG.warn("Found {} OAuth Bearer tokens in Subject's private credentials; the oldest expires at {}, will use the newest, which expires at {}",
+          sortedByLifetime.size(),
+          new Date(sortedByLifetime.first().lifetimeMs()),
+          new Date(sortedByLifetime.last().lifetimeMs()));
+        callback.token(sortedByLifetime.last());
+      }
     }
 
     /**
@@ -111,11 +126,19 @@ public class OAuthBearerSaslClientAuthenticationProvider extends OAuthBearerSasl
      */
     private static void handleCallback(SaslExtensionsCallback extensionsCallback, Subject subject) {
       if (subject != null && !subject.getPublicCredentials(SaslExtensions.class).isEmpty()) {
-        SaslExtensions extensions = subject.getPublicCredentials(SaslExtensions.class).iterator().next();
+        SaslExtensions extensions =
+          subject.getPublicCredentials(SaslExtensions.class).iterator().next();
         extensionsCallback.extensions(extensions);
       }
     }
 
+    @Override public void configure(Map<String, ?> configs, String saslMechanism,
+      List<AppConfigurationEntry> jaasConfigEntries) {
+    }
+
+    @Override public void close() {
+      // empty
+    }
   }
 
   @Override
