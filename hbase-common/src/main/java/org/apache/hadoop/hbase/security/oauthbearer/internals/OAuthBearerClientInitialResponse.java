@@ -17,15 +17,17 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals;
 
-import org.apache.hadoop.hbase.security.auth.SaslExtensions;
-import org.apache.hadoop.hbase.security.oauthbearer.Utils;
-import javax.security.sasl.SaslException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.security.sasl.SaslException;
+import org.apache.hadoop.hbase.security.auth.SaslExtensions;
+import org.apache.hadoop.hbase.security.oauthbearer.Utils;
+import org.apache.yetus.audience.InterfaceAudience;
 
+@InterfaceAudience.Public
 public class OAuthBearerClientInitialResponse {
   static final String SEPARATOR = "\u0001";
 

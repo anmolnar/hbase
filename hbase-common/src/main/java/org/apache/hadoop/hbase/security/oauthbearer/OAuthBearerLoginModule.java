@@ -33,6 +33,7 @@ import org.apache.hadoop.hbase.security.auth.SaslExtensions;
 import org.apache.hadoop.hbase.security.auth.SaslExtensionsCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.internals.OAuthBearerSaslClientProvider;
 import org.apache.hadoop.hbase.security.oauthbearer.internals.OAuthBearerSaslServerProvider;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,6 +233,7 @@ import org.slf4j.LoggerFactory;
  * @see SaslConfigs#SASL_LOGIN_REFRESH_MIN_PERIOD_SECONDS_DOC
  * @see SaslConfigs#SASL_LOGIN_REFRESH_BUFFER_SECONDS_DOC
  */
+@InterfaceAudience.Public
 public class OAuthBearerLoginModule implements LoginModule {
 
   /**

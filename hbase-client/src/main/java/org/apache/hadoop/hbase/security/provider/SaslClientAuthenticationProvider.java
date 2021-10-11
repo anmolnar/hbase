@@ -20,9 +20,7 @@ package org.apache.hadoop.hbase.security.provider;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Map;
-
 import javax.security.sasl.SaslClient;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.hbase.security.SecurityInfo;
@@ -32,7 +30,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
-
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.UserInformation;
 
 /**

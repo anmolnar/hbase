@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.hbase.exceptions;
 
+import org.apache.yetus.audience.InterfaceAudience;
+
 /**
  * This exception indicates unexpected requests prior to SASL authentication.
  * This could be due to misconfigured security, e.g. if PLAINTEXT protocol
  * is used to connect to a SASL endpoint.
  */
+@InterfaceAudience.Public
 public class IllegalSaslStateException extends IllegalStateException {
 
   private static final long serialVersionUID = 1L;

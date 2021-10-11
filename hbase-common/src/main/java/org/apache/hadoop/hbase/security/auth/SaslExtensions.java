@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hbase.security.auth;
 
+import org.apache.yetus.audience.InterfaceAudience;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+@InterfaceAudience.Public
 public class SaslExtensions {
   /**
    * An "empty" instance indicating no SASL extensions

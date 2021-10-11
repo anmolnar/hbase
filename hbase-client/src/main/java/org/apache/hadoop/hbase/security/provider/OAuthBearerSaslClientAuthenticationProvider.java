@@ -66,7 +66,8 @@ public class OAuthBearerSaslClientAuthenticationProvider
   }
 
   public static class OAuthBearerSaslClientCallbackHandler implements AuthenticateCallbackHandler {
-    private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSaslClientCallbackHandler.class);
+    private static final Logger LOG =
+      LoggerFactory.getLogger(OAuthBearerSaslClientCallbackHandler.class);
 
     @Override
     public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
@@ -74,7 +75,8 @@ public class OAuthBearerSaslClientAuthenticationProvider
         if (callback instanceof OAuthBearerTokenCallback) {
           handleCallback((OAuthBearerTokenCallback) callback);
         } else if (callback instanceof SaslExtensionsCallback) {
-          handleCallback((SaslExtensionsCallback) callback, Subject.getSubject(AccessController.getContext()));
+          handleCallback((SaslExtensionsCallback) callback,
+            Subject.getSubject(AccessController.getContext()));
         } else {
           throw new UnsupportedCallbackException(callback);
         }

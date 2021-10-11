@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.security.auth.SaslExtensions;
 import org.apache.hadoop.hbase.security.auth.SaslExtensionsCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerTokenCallback;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +50,7 @@ import org.slf4j.LoggerFactory;
  *      Section 2.1</a>
  *
  */
+@InterfaceAudience.Public
 public class OAuthBearerSaslClient implements SaslClient {
   static final byte BYTE_CONTROL_A = (byte) 0x01;
   private static final Logger log = LoggerFactory.getLogger(OAuthBearerSaslClient.class);

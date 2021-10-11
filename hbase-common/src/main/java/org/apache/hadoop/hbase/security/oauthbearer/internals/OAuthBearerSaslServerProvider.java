@@ -17,15 +17,17 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals;
 
-import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import java.security.Provider;
 import java.security.Security;
+import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
+import org.apache.yetus.audience.InterfaceAudience;
 
+@InterfaceAudience.Public
 public class OAuthBearerSaslServerProvider extends Provider {
   private static final long serialVersionUID = 1L;
 
   protected OAuthBearerSaslServerProvider() {
-    super("SASL/OAUTHBEARER Server Provider", 1.0, "SASL/OAUTHBEARER Server Provider for Kafka");
+    super("SASL/OAUTHBEARER Server Provider", 1.0, "SASL/OAUTHBEARER Server Provider for HBase");
     put("SaslServerFactory." + OAuthBearerLoginModule.OAUTHBEARER_MECHANISM,
       OAuthBearerSaslServer.OAuthBearerSaslServerFactory.class.getName());
   }

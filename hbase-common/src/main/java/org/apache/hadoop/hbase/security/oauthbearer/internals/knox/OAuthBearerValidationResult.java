@@ -18,11 +18,13 @@
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
 import java.io.Serializable;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The result of some kind of token validation
  */
-public class OAuthBearerValidationResult implements Serializable {
+@InterfaceAudience.Public
+public final class OAuthBearerValidationResult implements Serializable {
   private static final long serialVersionUID = 5774669940899777373L;
   private final boolean success;
   private final String failureDescription;
@@ -121,7 +123,8 @@ public class OAuthBearerValidationResult implements Serializable {
    *             if this instance indicates failure
    */
   public void throwExceptionIfFailed() throws OAuthBearerIllegalTokenException {
-    if (!success())
+    if (!success()) {
       throw new OAuthBearerIllegalTokenException(this);
+    }
   }
 }

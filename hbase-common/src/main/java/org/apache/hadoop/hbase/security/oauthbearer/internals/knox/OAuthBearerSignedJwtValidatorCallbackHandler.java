@@ -31,9 +31,11 @@ import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.hadoop.util.Time;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@InterfaceAudience.Public
 public class OAuthBearerSignedJwtValidatorCallbackHandler implements AuthenticateCallbackHandler {
   private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSignedJwtValidatorCallbackHandler.class);
   private static final String OPTION_PREFIX = "signedJwtValidator";

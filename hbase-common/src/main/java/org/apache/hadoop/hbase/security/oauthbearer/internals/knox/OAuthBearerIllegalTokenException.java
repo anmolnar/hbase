@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
+import org.apache.yetus.audience.InterfaceAudience;
 import java.util.Objects;
 
 /**
  * Exception thrown when token validation fails due to a problem with the token
  * itself (as opposed to a missing remote resource or a configuration problem)
  */
+@InterfaceAudience.Public
 public class OAuthBearerIllegalTokenException extends RuntimeException {
   private static final long serialVersionUID = -5275276640051316350L;
   private final OAuthBearerValidationResult reason;

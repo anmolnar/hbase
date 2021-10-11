@@ -17,10 +17,13 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
+import org.apache.yetus.audience.InterfaceAudience;
+
 /**
  * Exception thrown when there is a problem with the configuration (an invalid
  * option in a JAAS config, for example).
  */
+@InterfaceAudience.Public
 public class OAuthBearerConfigException extends RuntimeException {
   private static final long serialVersionUID = -8056105648062343518L;
 

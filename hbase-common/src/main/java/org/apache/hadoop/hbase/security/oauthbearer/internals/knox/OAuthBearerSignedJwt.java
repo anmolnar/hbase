@@ -35,6 +35,7 @@ import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -53,6 +54,7 @@ import java.util.Set;
 /**
  * Signed JWT implementation for OAuth Bearer authentication mech of SASL.
  */
+@InterfaceAudience.Public
 public class OAuthBearerSignedJwt implements OAuthBearerToken {
   private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSignedJwt.class);
 
@@ -184,12 +186,15 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
   public boolean isClaimType(String claimName, Class<?> type) {
     Object value = rawClaim(claimName);
     Objects.requireNonNull(type);
-    if (value == null)
+    if (value == null) {
       return false;
-    if (type == String.class && value instanceof String)
+    }
+    if (type == String.class && value instanceof String) {
       return true;
-    if (type == Number.class && value instanceof Number)
+    }
+    if (type == Number.class && value instanceof Number) {
       return true;
+    }
     return type == List.class && value instanceof List;
   }
 
@@ -287,9 +292,12 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
     try {
       byte[] decode = Base64.getDecoder().decode(split);
       JsonNode jsonNode = new ObjectMapper().readTree(decode);
-      if (jsonNode == null)
-        throw new OAuthBearerIllegalTokenException(OAuthBearerValidationResult.newFailure("malformed JSON"));
-      for (Iterator<Map.Entry<String, JsonNode>> iterator = jsonNode.fields(); iterator.hasNext();) {
+      if (jsonNode == null) {
+        throw new OAuthBearerIllegalTokenException(
+          OAuthBearerValidationResult.newFailure("malformed JSON"));
+      }
+      for (Iterator<Map.Entry<String, JsonNode>> iterator = jsonNode.fields();
+           iterator.hasNext();) {
         Map.Entry<String, JsonNode> entry = iterator.next();
         retval.put(entry.getKey(), convert(entry.getValue()));
       }
@@ -299,15 +307,17 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
       throw new OAuthBearerIllegalTokenException(
         OAuthBearerValidationResult.newFailure("malformed Base64 URL encoded value"));
     } catch (IOException e) {
-      throw new OAuthBearerIllegalTokenException(OAuthBearerValidationResult.newFailure("malformed JSON"));
+      throw new OAuthBearerIllegalTokenException(
+        OAuthBearerValidationResult.newFailure("malformed JSON"));
     }
   }
 
   private static Object convert(JsonNode value) {
     if (value.isArray()) {
       List<String> retvalList = new ArrayList<>();
-      for (JsonNode arrayElement : value)
+      for (JsonNode arrayElement : value) {
         retvalList.add(arrayElement.asText());
+      }
       return retvalList;
     }
     return value.getNodeType() == JsonNodeType.NUMBER ? value.numberValue() : value.asText();
@@ -326,9 +336,9 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
     String scopeClaimName = scopeClaimName();
     if (isClaimType(scopeClaimName, String.class)) {
       String scopeClaimValue = claim(scopeClaimName, String.class);
-      if (Utils.isBlank(scopeClaimValue))
+      if (Utils.isBlank(scopeClaimValue)) {
         return Collections.emptySet();
-      else {
+      } else {
         Set<String> retval = new HashSet<>();
         retval.add(scopeClaimValue.trim());
         return Collections.unmodifiableSet(retval);
@@ -357,11 +367,13 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
    * @param jwtToken the token to validate
    * @return true if valid
    */
-  private JWTClaimsSet validateToken(String jwtToken) throws BadJOSEException, JOSEException, ParseException {
+  private JWTClaimsSet validateToken(String jwtToken)
+    throws BadJOSEException, JOSEException, ParseException {
     JWT jwt = JWTParser.parse(jwtToken);
     ConfigurableJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
     JWSKeySelector<SecurityContext> keySelector =
-      new JWSVerificationKeySelector<>((JWSAlgorithm)jwt.getHeader().getAlgorithm(), new ImmutableJWKSet<>(jwkSet));
+      new JWSVerificationKeySelector<>((JWSAlgorithm)jwt.getHeader().getAlgorithm(),
+        new ImmutableJWKSet<>(jwkSet));
     jwtProcessor.setJWSKeySelector(keySelector);
     return jwtProcessor.process(jwtToken, null);
   }

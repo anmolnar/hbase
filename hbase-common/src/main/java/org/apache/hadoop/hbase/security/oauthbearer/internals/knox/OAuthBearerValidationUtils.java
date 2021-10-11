@@ -21,8 +21,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
+import org.apache.yetus.audience.InterfaceAudience;
 
-public class OAuthBearerValidationUtils {
+@InterfaceAudience.Public
+public final class OAuthBearerValidationUtils {
   /**
    * Validate the given claim for existence and type. It can be required to exist
    * in the given claims, and if it exists it must be one of the types indicated

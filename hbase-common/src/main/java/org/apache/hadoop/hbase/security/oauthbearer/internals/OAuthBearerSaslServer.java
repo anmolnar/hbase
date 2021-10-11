@@ -37,6 +37,7 @@ import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
+import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,7 @@ import org.slf4j.LoggerFactory;
  * in a custom authorizer (to authorize based on JWT claims rather than ACLs,
  * for example).
  */
+@InterfaceAudience.Public
 public class OAuthBearerSaslServer implements SaslServer {
 
   private static final Logger log = LoggerFactory.getLogger(OAuthBearerSaslServer.class);

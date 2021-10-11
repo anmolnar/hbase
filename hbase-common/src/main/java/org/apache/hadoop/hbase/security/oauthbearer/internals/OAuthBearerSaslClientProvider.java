@@ -20,7 +20,9 @@ package org.apache.hadoop.hbase.security.oauthbearer.internals;
 import java.security.Provider;
 import java.security.Security;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
+import org.apache.yetus.audience.InterfaceAudience;
 
+@InterfaceAudience.Public
 public class OAuthBearerSaslClientProvider extends Provider {
   private static final long serialVersionUID = 1L;
 

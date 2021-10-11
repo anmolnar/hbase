@@ -1,12 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.hbase.security.oauthbearer;
 
-import org.apache.hadoop.hbase.security.auth.SaslExtensions;
-import javax.security.auth.callback.Callback;
+import static org.apache.hadoop.hbase.security.oauthbearer.Utils.subtractMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import static org.apache.hadoop.hbase.security.oauthbearer.Utils.subtractMap;
+import javax.security.auth.callback.Callback;
+import org.apache.hadoop.hbase.security.auth.SaslExtensions;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * A {@code Callback} for use by the {@code SaslServer} implementation when it
@@ -25,6 +43,7 @@ import static org.apache.hadoop.hbase.security.oauthbearer.Utils.subtractMap;
  * It is very important that token validation is done in its own {@link OAuthBearerValidatorCallback}
  * irregardless of provided extensions, as they are inherently insecure.
  */
+@InterfaceAudience.Public
 public class OAuthBearerExtensionsValidatorCallback implements Callback {
   private final OAuthBearerToken token;
   private final SaslExtensions inputExtensions;

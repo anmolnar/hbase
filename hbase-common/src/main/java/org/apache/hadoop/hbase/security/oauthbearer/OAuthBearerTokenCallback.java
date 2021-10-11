@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer;
 
+import org.apache.yetus.audience.InterfaceAudience;
 import java.util.Objects;
 
 import javax.security.auth.callback.Callback;
@@ -36,6 +37,7 @@ import javax.security.auth.callback.Callback;
  * update the {@code InterfaceStability} annotation and this notice once the API
  * is considered stable.
  */
+@InterfaceAudience.Public
 public class OAuthBearerTokenCallback implements Callback {
   private OAuthBearerToken token = null;
   private String errorCode = null;

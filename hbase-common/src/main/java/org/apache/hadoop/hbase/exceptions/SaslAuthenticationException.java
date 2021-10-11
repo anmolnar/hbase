@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.exceptions;
 
 import javax.security.sasl.SaslServer;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * This exception indicates that SASL authentication has failed. The error message
@@ -34,6 +35,7 @@ import javax.security.sasl.SaslServer;
  * security-critical information in the message that should not be leaked to unauthenticated clients.
  * </p>
  */
+@InterfaceAudience.Public
 public class SaslAuthenticationException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;

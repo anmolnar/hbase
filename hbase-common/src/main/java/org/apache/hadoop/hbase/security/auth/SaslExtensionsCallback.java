@@ -18,13 +18,14 @@
 package org.apache.hadoop.hbase.security.auth;
 
 import java.util.Objects;
-
 import javax.security.auth.callback.Callback;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Optional callback used for SASL mechanisms if any extensions need to be set
  * in the SASL exchange.
  */
+@InterfaceAudience.Public
 public class SaslExtensionsCallback implements Callback {
   private SaslExtensions extensions = SaslExtensions.NO_SASL_EXTENSIONS;
 
