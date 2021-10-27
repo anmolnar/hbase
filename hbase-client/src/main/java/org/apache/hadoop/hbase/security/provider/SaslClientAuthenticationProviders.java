@@ -172,6 +172,7 @@ public final class SaslClientAuthenticationProviders {
         ServiceLoader.load(SaslClientAuthenticationProvider.class);
     HashMap<Byte,SaslClientAuthenticationProvider> providerMap = new HashMap<>();
     for (SaslClientAuthenticationProvider provider : loader) {
+      LOG.info("Provider: " + provider.toString());
       addProviderIfNotExists(provider, providerMap);
     }
 

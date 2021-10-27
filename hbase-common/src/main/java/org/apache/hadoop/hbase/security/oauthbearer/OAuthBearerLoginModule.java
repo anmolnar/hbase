@@ -267,6 +267,7 @@ public class OAuthBearerLoginModule implements LoginModule {
   static {
     OAuthBearerSaslClientProvider.initialize(); // not part of public API
     OAuthBearerSaslServerProvider.initialize(); // not part of public API
+    LOG.info("OAuthBearer Login Module has been initialized");
   }
 
   @Override

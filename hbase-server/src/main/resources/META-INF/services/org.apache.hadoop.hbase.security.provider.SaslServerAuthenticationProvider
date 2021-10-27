@@ -15,5 +15,6 @@
 # limitations under the License.
 org.apache.hadoop.hbase.security.provider.DigestSaslServerAuthenticationProvider
 org.apache.hadoop.hbase.security.provider.GssSaslServerAuthenticationProvider
+org.apache.hadoop.hbase.security.provider.OAuthBearerSaslServerAuthenticationProvider
 org.apache.hadoop.hbase.security.provider.SimpleSaslServerAuthenticationProvider
 
