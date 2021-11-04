@@ -26,12 +26,16 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Private
 public class OAuthBearerSaslProviderSelector extends BuiltInProviderSelector {
 
+  private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSaslProviderSelector.class);
+
   private final Text OAUTHBEARER_TOKEN_KIND_TEXT =
-    new Text(OAuthBearerSaslAuthenticationProvider.JWT_TOKEN_TYPE);
+    new Text(OAuthBearerSaslAuthenticationProvider.TOKEN_KIND);
   private OAuthBearerSaslClientAuthenticationProvider oauthbearer;
 
   @Override public void configure(Configuration conf,
@@ -55,6 +59,7 @@ public class OAuthBearerSaslProviderSelector extends BuiltInProviderSelector {
       .filter((t) -> OAUTHBEARER_TOKEN_KIND_TEXT.equals(t.getKind()))
       .findFirst();
     if (optional.isPresent()) {
+      LOG.info("JWT token found!");
       return new Pair<>(oauthbearer, optional.get());
     }
 

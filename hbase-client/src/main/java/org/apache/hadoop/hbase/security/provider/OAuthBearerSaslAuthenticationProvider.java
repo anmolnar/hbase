@@ -26,7 +26,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Private
 public class OAuthBearerSaslAuthenticationProvider extends BuiltInSaslAuthenticationProvider {
 
-  public static final String JWT_TOKEN_TYPE = "JWT_AUTH_TOKEN";
+  public static final String TOKEN_KIND = "JWT_AUTH_TOKEN";
   public static final SaslAuthMethod SASL_AUTH_METHOD = new SaslAuthMethod(
       "OAUTHBEARER", (byte)83, "OAUTHBEARER", UserGroupInformation.AuthenticationMethod.TOKEN);
 
@@ -37,6 +37,6 @@ public class OAuthBearerSaslAuthenticationProvider extends BuiltInSaslAuthentica
 
   @Override
   public String getTokenKind() {
-    return JWT_TOKEN_TYPE;
+    return TOKEN_KIND;
   }
 }

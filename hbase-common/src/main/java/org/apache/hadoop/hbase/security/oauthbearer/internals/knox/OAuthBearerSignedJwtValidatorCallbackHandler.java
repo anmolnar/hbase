@@ -21,13 +21,11 @@ import com.nimbusds.jose.jwk.JWKSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.AppConfigurationEntry;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerExtensionsValidatorCallback;
-import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.hadoop.util.Time;
@@ -44,43 +42,13 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   private static final String REQUIRED_SCOPE_OPTION = OPTION_PREFIX + "RequiredScope";
   private static final String ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION = OPTION_PREFIX + "AllowableClockSkewMs";
   private final JWKSet jwkSet;
-  private Map<String, String> moduleOptions = null;
-  private boolean configured = false;
 
   public OAuthBearerSignedJwtValidatorCallbackHandler(JWKSet jwkSet) {
     this.jwkSet = jwkSet;
   }
 
-  /**
-   * Return true if this instance has been configured, otherwise false
-   *
-   * @return true if this instance has been configured, otherwise false
-   */
-  public boolean configured() {
-    return configured;
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override
-  public void configure(Map<String, ?> configs, String saslMechanism,
-    List<AppConfigurationEntry> jaasConfigEntries) {
-    if (!OAuthBearerLoginModule.OAUTHBEARER_MECHANISM.equals(saslMechanism))
-      throw new IllegalArgumentException(String.format("Unexpected SASL mechanism: %s", saslMechanism));
-    if (Objects.requireNonNull(jaasConfigEntries).size() != 1 || jaasConfigEntries.get(0) == null)
-      throw new IllegalArgumentException(
-        String.format("Must supply exactly 1 non-null JAAS mechanism configuration (size was %d)",
-          jaasConfigEntries.size()));
-    final Map<String, String> unmodifiableModuleOptions = Collections
-      .unmodifiableMap((Map<String, String>) jaasConfigEntries.get(0).getOptions());
-    this.moduleOptions = unmodifiableModuleOptions;
-    configured = true;
-  }
-
   @Override
   public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
-    if (!configured()) {
-      throw new IllegalStateException("Callback handler not configured");
-    }
     for (Callback callback : callbacks) {
       if (callback instanceof OAuthBearerValidatorCallback) {
         OAuthBearerValidatorCallback validationCallback = (OAuthBearerValidatorCallback) callback;
@@ -99,6 +67,10 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
         throw new UnsupportedCallbackException(callback);
       }
     }
+  }
+
+  @Override public void configure(Map<String, ?> configs, String saslMechanism,
+    List<AppConfigurationEntry> jaasConfigEntries) {
   }
 
   @Override
@@ -163,9 +135,6 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   }
 
   private String option(String key) {
-    if (!configured) {
-      throw new IllegalStateException("Callback handler not configured");
-    }
-    return moduleOptions.get(Objects.requireNonNull(key));
+    return "";
   }
 }

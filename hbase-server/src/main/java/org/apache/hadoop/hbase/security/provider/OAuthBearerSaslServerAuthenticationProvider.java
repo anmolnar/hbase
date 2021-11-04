@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.security.oauthbearer.internals.OAuthBearerSaslServerProvider;
 import org.apache.hadoop.hbase.security.oauthbearer.internals.knox.OAuthBearerSignedJwtValidatorCallbackHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
@@ -39,6 +40,12 @@ public class OAuthBearerSaslServerAuthenticationProvider
 
   private static final Logger LOG = LoggerFactory.getLogger(
     OAuthBearerSaslServerAuthenticationProvider.class);
+
+  static {
+    OAuthBearerSaslServerProvider.initialize(); // not part of public API
+    LOG.info("OAuthBearer SASL server provider has been initialized");
+  }
+
   private JWKSet jwkSet;
 
   @Override public void init(Configuration conf) throws IOException {

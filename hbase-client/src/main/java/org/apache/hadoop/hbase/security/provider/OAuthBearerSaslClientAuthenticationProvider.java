@@ -95,6 +95,7 @@ public class OAuthBearerSaslClientAuthenticationProvider
         throw new IOException("No OAuth Bearer tokens in Subject's private credentials");
       }
       if (privateCredentials.size() == 1) {
+        LOG.debug("Found 1 OAuthBearer token");
         callback.token(privateCredentials.iterator().next());
       } else {
         /*
