@@ -19,13 +19,11 @@ package org.apache.hadoop.hbase.security.provider;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
@@ -160,7 +158,7 @@ public final class SaslServerAuthenticationProviders {
       try {
         // Give them a copy, just to make sure there is no funny-business going on.
         provider.init(new Configuration(conf));
-      } catch (IOException | ParseException e) {
+      } catch (IOException e) {
         LOG.error("Failed to initialize {}", provider.getClass(), e);
         throw new RuntimeException(
             "Failed to initialize " + provider.getClass().getName(), e);

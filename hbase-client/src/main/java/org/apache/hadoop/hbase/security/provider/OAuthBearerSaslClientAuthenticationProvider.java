@@ -23,7 +23,6 @@ import java.security.AccessController;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -31,7 +30,6 @@ import java.util.TreeSet;
 import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
-import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslClient;
 import org.apache.hadoop.conf.Configuration;
@@ -60,9 +58,10 @@ public class OAuthBearerSaslClientAuthenticationProvider
                                  SecurityInfo securityInfo, Token<? extends TokenIdentifier> token,
                                  boolean fallbackAllowed,
                                  Map<String, String> saslProps) throws IOException {
+    AuthenticateCallbackHandler callbackHandler = new OAuthBearerSaslClientCallbackHandler();
+    callbackHandler.configure(conf);
     return Sasl.createSaslClient(new String[] { getSaslAuthMethod().getSaslMechanism() }, null,
-        null, SaslUtil.SASL_DEFAULT_REALM, saslProps,
-      new OAuthBearerSaslClientCallbackHandler());
+        null, SaslUtil.SASL_DEFAULT_REALM, saslProps, callbackHandler);
   }
 
   public static class OAuthBearerSaslClientCallbackHandler implements AuthenticateCallbackHandler {
@@ -116,7 +115,8 @@ public class OAuthBearerSaslClientAuthenticationProvider
               }
             });
         sortedByLifetime.addAll(privateCredentials);
-        LOG.warn("Found {} OAuth Bearer tokens in Subject's private credentials; the oldest expires at {}, will use the newest, which expires at {}",
+        LOG.warn("Found {} OAuth Bearer tokens in Subject's private credentials; "
+            + "the oldest expires at {}, will use the newest, which expires at {}",
           sortedByLifetime.size(),
           new Date(sortedByLifetime.first().lifetimeMs()),
           new Date(sortedByLifetime.last().lifetimeMs()));
@@ -135,8 +135,7 @@ public class OAuthBearerSaslClientAuthenticationProvider
       }
     }
 
-    @Override public void configure(Map<String, ?> configs, String saslMechanism,
-      List<AppConfigurationEntry> jaasConfigEntries) {
+    @Override public void configure(Configuration conf) {
     }
 
     @Override public void close() {

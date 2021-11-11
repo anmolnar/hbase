@@ -18,12 +18,15 @@
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
 import com.nimbusds.jose.jwk.JWKSet;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.text.ParseException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
-import javax.security.auth.login.AppConfigurationEntry;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerExtensionsValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
@@ -35,17 +38,19 @@ import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Public
 public class OAuthBearerSignedJwtValidatorCallbackHandler implements AuthenticateCallbackHandler {
-  private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSignedJwtValidatorCallbackHandler.class);
-  private static final String OPTION_PREFIX = "signedJwtValidator";
-  private static final String PRINCIPAL_CLAIM_NAME_OPTION = OPTION_PREFIX + "PrincipalClaimName";
-  private static final String SCOPE_CLAIM_NAME_OPTION = OPTION_PREFIX + "ScopeClaimName";
-  private static final String REQUIRED_SCOPE_OPTION = OPTION_PREFIX + "RequiredScope";
-  private static final String ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION = OPTION_PREFIX + "AllowableClockSkewMs";
-  private final JWKSet jwkSet;
-
-  public OAuthBearerSignedJwtValidatorCallbackHandler(JWKSet jwkSet) {
-    this.jwkSet = jwkSet;
-  }
+  private static final Logger LOG =
+    LoggerFactory.getLogger(OAuthBearerSignedJwtValidatorCallbackHandler.class);
+  private static final String OPTION_PREFIX = "hbase.security.oauth.jwt.";
+  private static final String JWKS_URL = OPTION_PREFIX + "jwks.url";
+  private static final String JWKS_FILE = OPTION_PREFIX + "jwks.file";
+  private static final String PRINCIPAL_CLAIM_NAME_OPTION = OPTION_PREFIX + "principalclaim";
+  private static final String SCOPE_CLAIM_NAME_OPTION = OPTION_PREFIX + "scopeclaim";
+  private static final String REQUIRED_SCOPE_OPTION = OPTION_PREFIX + "requiredscope";
+  private static final String ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION =
+    OPTION_PREFIX + "allowableclockskewms";
+  private Configuration hBaseConfiguration;
+  private JWKSet jwkSet;
+  private boolean configured = false;
 
   @Override
   public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
@@ -55,24 +60,31 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
         try {
           handleCallback(validationCallback);
         } catch (OAuthBearerIllegalTokenException e) {
-          LOG.error("Signed JWT token validation error", e);
+          LOG.error("Signed JWT token validation error: {}", e.getMessage());
           OAuthBearerValidationResult failureReason = e.reason();
           String failureScope = failureReason.failureScope();
           validationCallback.error(failureScope != null ? "insufficient_scope" : "invalid_token",
             failureScope, failureReason.failureOpenIdConfig());
         }
       } else if (callback instanceof OAuthBearerExtensionsValidatorCallback) {
-        OAuthBearerExtensionsValidatorCallback extensionsCallback = (OAuthBearerExtensionsValidatorCallback) callback;
-        extensionsCallback.inputExtensions().map().forEach((extensionName, v) -> extensionsCallback.valid(extensionName));
+        OAuthBearerExtensionsValidatorCallback extensionsCallback =
+          (OAuthBearerExtensionsValidatorCallback) callback;
+        extensionsCallback.inputExtensions().map().forEach((extensionName, v) ->
+          extensionsCallback.valid(extensionName));
       } else {
         throw new UnsupportedCallbackException(callback);
       }
     }
   }
 
-  @Override public void configure(Map<String, ?> configs, String saslMechanism,
-    List<AppConfigurationEntry> jaasConfigEntries) {
-
+  @Override public void configure(Configuration conf) {
+    this.hBaseConfiguration = conf;
+    try {
+      loadJwkSet();
+    } catch (IOException | ParseException e) {
+      throw new RuntimeException("Unable to initialize JWK Set", e);
+    }
+    configured = true;
   }
 
   @Override
@@ -81,6 +93,10 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   }
 
   private void handleCallback(OAuthBearerValidatorCallback callback) {
+    if (!configured) {
+      throw new RuntimeException("Callback handler be configured first.");
+    }
+
     String tokenValue = callback.tokenValue();
     if (tokenValue == null) {
       throw new IllegalArgumentException("Callback missing required token value");
@@ -107,36 +123,55 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   }
 
   private String principalClaimName() {
-    String principalClaimNameValue = option(PRINCIPAL_CLAIM_NAME_OPTION);
+    String principalClaimNameValue = hBaseConfiguration.get(PRINCIPAL_CLAIM_NAME_OPTION);
     return Utils.isBlank(principalClaimNameValue) ? "sub" : principalClaimNameValue.trim();
   }
 
   private String scopeClaimName() {
-    String scopeClaimNameValue = option(SCOPE_CLAIM_NAME_OPTION);
+    String scopeClaimNameValue = hBaseConfiguration.get(SCOPE_CLAIM_NAME_OPTION);
     return Utils.isBlank(scopeClaimNameValue) ? "scope" : scopeClaimNameValue.trim();
   }
 
   private List<String> requiredScope() {
-    String requiredSpaceDelimitedScope = option(REQUIRED_SCOPE_OPTION);
-    return Utils.isBlank(requiredSpaceDelimitedScope) ? Collections.emptyList() : OAuthBearerScopeUtils.parseScope(requiredSpaceDelimitedScope.trim());
+    String requiredSpaceDelimitedScope = hBaseConfiguration.get(REQUIRED_SCOPE_OPTION);
+    return Utils.isBlank(requiredSpaceDelimitedScope)
+      ? Collections.emptyList()
+      : OAuthBearerScopeUtils.parseScope(requiredSpaceDelimitedScope.trim());
   }
 
   private int allowableClockSkewMs() {
-    String allowableClockSkewMsValue = option(ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION);
+    String allowableClockSkewMsValue = hBaseConfiguration.get(ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION);
     int allowableClockSkewMs = 0;
     try {
-      allowableClockSkewMs = Utils.isBlank(allowableClockSkewMsValue) ? 0 : Integer.parseInt(allowableClockSkewMsValue.trim());
+      allowableClockSkewMs = Utils.isBlank(allowableClockSkewMsValue)
+        ? 0 : Integer.parseInt(allowableClockSkewMsValue.trim());
     } catch (NumberFormatException e) {
       throw new OAuthBearerConfigException(e.getMessage(), e);
     }
     if (allowableClockSkewMs < 0) {
       throw new OAuthBearerConfigException(
-        String.format("Allowable clock skew millis must not be negative: %s", allowableClockSkewMsValue));
+        String.format("Allowable clock skew millis must not be negative: %s",
+          allowableClockSkewMsValue));
     }
     return allowableClockSkewMs;
   }
 
-  private String option(String key) {
-    return "";
+  private void loadJwkSet() throws IOException, ParseException {
+    String jwksFile = hBaseConfiguration.get(JWKS_FILE);
+    String jwksUrl = hBaseConfiguration.get(JWKS_URL);
+
+    if (Utils.isBlank(jwksFile) && Utils.isBlank(jwksUrl)) {
+      throw new RuntimeException("Failed to initialize JWKS db. "
+        + "URL or File must be specified in the config.");
+    }
+
+    if (!Utils.isBlank(jwksFile)) {
+      this.jwkSet = JWKSet.load(new File(jwksFile));
+      LOG.debug("JWKS db initialized from file: {}", jwksFile);
+      return;
+    }
+
+    this.jwkSet = JWKSet.load(new URL(jwksUrl));
+    LOG.debug("JWKS db initialized from URL: {}", jwksUrl);
   }
 }
