@@ -89,7 +89,7 @@ public class OAuthBearerSaslServer implements SaslServer {
       LOG.debug("SASL server evaluate response started");
 
       if (response.length == 1 && response[0] == OAuthBearerSaslClient.BYTE_CONTROL_A && errorMessage != null) {
-        LOG.debug("Received %x01 response from client after it received our error");
+        LOG.error("Received %x01 response from client after it received our error");
         throw new SaslAuthenticationException(errorMessage);
       }
       errorMessage = null;
@@ -174,7 +174,7 @@ public class OAuthBearerSaslServer implements SaslServer {
     if (token == null) {
       errorMessage = jsonErrorResponse(callback.errorStatus(), callback.errorScope(),
         callback.errorOpenIDConfiguration());
-      LOG.debug(errorMessage);
+      LOG.error("JWT token validation error: {}", errorMessage);
       return errorMessage.getBytes(StandardCharsets.UTF_8);
     }
     /*
@@ -218,11 +218,13 @@ public class OAuthBearerSaslServer implements SaslServer {
 
   private static String jsonErrorResponse(String errorStatus, String errorScope, String errorOpenIDConfiguration) {
     String jsonErrorResponse = String.format("{\"status\":\"%s\"", errorStatus);
-    if (errorScope != null)
+    if (errorScope != null) {
       jsonErrorResponse = String.format("%s, \"scope\":\"%s\"", jsonErrorResponse, errorScope);
-    if (errorOpenIDConfiguration != null)
+    }
+    if (errorOpenIDConfiguration != null) {
       jsonErrorResponse = String.format("%s, \"openid-configuration\":\"%s\"", jsonErrorResponse,
         errorOpenIDConfiguration);
+    }
     jsonErrorResponse = String.format("%s}", jsonErrorResponse);
     return jsonErrorResponse;
   }

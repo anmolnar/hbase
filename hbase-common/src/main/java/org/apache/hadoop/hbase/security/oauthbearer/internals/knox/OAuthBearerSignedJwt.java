@@ -33,16 +33,12 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
-import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
-import org.apache.hadoop.hbase.security.oauthbearer.Utils;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -50,6 +46,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
+import org.apache.hadoop.hbase.security.oauthbearer.Utils;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Signed JWT implementation for OAuth Bearer authentication mech of SASL.
@@ -244,7 +245,8 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
    *             if the claim value is the incorrect type
    */
   public Number expirationTime() throws OAuthBearerIllegalTokenException {
-    return claim("exp", Number.class);
+    Date expTime = claim("exp", Date.class);
+    return expTime.getTime();
   }
 
   /**

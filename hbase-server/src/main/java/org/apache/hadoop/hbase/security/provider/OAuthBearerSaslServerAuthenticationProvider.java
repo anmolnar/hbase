@@ -18,8 +18,11 @@
 package org.apache.hadoop.hbase.security.provider;
 
 import com.nimbusds.jose.jwk.JWKSet;
+import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.security.PrivilegedExceptionAction;
+import java.text.ParseException;
 import java.util.Map;
 import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
@@ -40,6 +43,8 @@ public class OAuthBearerSaslServerAuthenticationProvider
 
   private static final Logger LOG = LoggerFactory.getLogger(
     OAuthBearerSaslServerAuthenticationProvider.class);
+  private static final String HBASE_SECURITY_OAUTH_JWKS_URL = "hbase.security.oauth.jwks.url";
+  private static final String HBASE_SECURITY_OAUTH_JWKS_FILE = "hbase.security.oauth.jwks.file";
 
   static {
     OAuthBearerSaslServerProvider.initialize(); // not part of public API
@@ -48,8 +53,22 @@ public class OAuthBearerSaslServerAuthenticationProvider
 
   private JWKSet jwkSet;
 
-  @Override public void init(Configuration conf) throws IOException {
-    this.jwkSet = new JWKSet();
+  @Override public void init(Configuration conf) throws IOException, ParseException {
+    String jwksFile = conf.get(HBASE_SECURITY_OAUTH_JWKS_FILE, "");
+    String jwksUrl = conf.get(HBASE_SECURITY_OAUTH_JWKS_URL);
+
+    if ("".equals(jwksFile) && "".equals(jwksUrl)) {
+      throw new RuntimeException("Failed to initialize JWKS db. URL or File must be specified in the config.");
+    }
+
+    if (!"".equals(jwksFile)) {
+      this.jwkSet = JWKSet.load(new File(jwksFile));
+      LOG.debug("JWKS db initialized from file: {}", jwksFile);
+      return;
+    }
+
+    this.jwkSet = JWKSet.load(new URL(jwksUrl));
+    LOG.debug("JWKS db initialized from URL: {}", jwksUrl);
   }
 
   @Override public AttemptingUserProvidingSaslServer createServer(

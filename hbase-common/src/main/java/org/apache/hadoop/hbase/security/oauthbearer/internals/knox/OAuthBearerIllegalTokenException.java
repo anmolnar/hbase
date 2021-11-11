@@ -38,15 +38,19 @@ public class OAuthBearerIllegalTokenException extends RuntimeException {
    */
   public OAuthBearerIllegalTokenException(OAuthBearerValidationResult reason) {
     super(Objects.requireNonNull(reason).failureDescription());
-    if (reason.success())
-      throw new IllegalArgumentException("The reason indicates success; it must instead indicate failure");
+    if (reason.success()) {
+      throw new IllegalArgumentException(
+        "The reason indicates success; it must instead indicate failure");
+    }
     this.reason = reason;
   }
 
   public OAuthBearerIllegalTokenException(OAuthBearerValidationResult reason, Throwable t) {
     super(Objects.requireNonNull(reason).failureDescription(), t);
-    if (reason.success())
-      throw new IllegalArgumentException("The reason indicates success; it must instead indicate failure");
+    if (reason.success()) {
+      throw new IllegalArgumentException(
+        "The reason indicates success; it must instead indicate failure");
+    }
     this.reason = reason;
   }
 

@@ -55,6 +55,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
         try {
           handleCallback(validationCallback);
         } catch (OAuthBearerIllegalTokenException e) {
+          LOG.error("Signed JWT token validation error", e);
           OAuthBearerValidationResult failureReason = e.reason();
           String failureScope = failureReason.failureScope();
           validationCallback.error(failureScope != null ? "insufficient_scope" : "invalid_token",
@@ -71,6 +72,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
 
   @Override public void configure(Map<String, ?> configs, String saslMechanism,
     List<AppConfigurationEntry> jaasConfigEntries) {
+
   }
 
   @Override

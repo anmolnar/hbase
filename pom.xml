@@ -1787,6 +1787,7 @@
     <wagon.ssh.version>2.12</wagon.ssh.version>
     <xml.maven.version>1.0.1</xml.maven.version>
     <hbase-thirdparty.version>3.5.1</hbase-thirdparty.version>
+    <nimbusds.version>9.15</nimbusds.version>
     <!-- Intraproject jar naming properties -->
     <!-- TODO this is pretty ugly, but works for the moment.
       Modules are pretty heavy-weight things, so doing this work isn't too bad. -->
@@ -3119,6 +3120,10 @@
                <artifactId>json-smart</artifactId>
              </exclusion>
              <exclusion>
+               <groupId>com.nimbusds</groupId>
+               <artifactId>nimbus-jose-jwt</artifactId>
+             </exclusion>
+             <exclusion>
                <groupId>org.slf4j</groupId>
                <artifactId>slf4j-log4j12</artifactId>
              </exclusion>
@@ -3333,6 +3338,12 @@
            <groupId>org.apache.hadoop</groupId>
            <artifactId>hadoop-hdfs-client</artifactId>
            <version>${hadoop-three.version}</version>
+         </dependency>
+
+         <dependency>
+           <groupId>com.nimbusds</groupId>
+           <artifactId>nimbus-jose-jwt</artifactId>
+           <version>${nimbusds.version}</version>
          </dependency>
        </dependencies>
      </dependencyManagement>
