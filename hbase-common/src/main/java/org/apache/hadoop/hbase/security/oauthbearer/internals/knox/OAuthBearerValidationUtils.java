@@ -41,19 +41,22 @@ public final class OAuthBearerValidationUtils {
    *            allowed to be if it exists
    * @return the result of the validation
    */
-  public static OAuthBearerValidationResult validateClaimForExistenceAndType(OAuthBearerSignedJwt jwt,
-    boolean required, String claimName, Class<?>... allowedTypes) {
+  public static OAuthBearerValidationResult validateClaimForExistenceAndType(
+    OAuthBearerSignedJwt jwt, boolean required, String claimName, Class<?>... allowedTypes) {
     Object rawClaim = Objects.requireNonNull(jwt).rawClaim(Objects.requireNonNull(claimName));
     if (rawClaim == null) {
       return required
-        ? OAuthBearerValidationResult.newFailure(String.format("Required claim missing: %s", claimName))
+        ? OAuthBearerValidationResult.newFailure(
+          String.format("Required claim missing: %s", claimName))
         : OAuthBearerValidationResult.newSuccess();
     }
     for (Class<?> allowedType : allowedTypes) {
-      if (allowedType != null && allowedType.isAssignableFrom(rawClaim.getClass()))
+      if (allowedType != null && allowedType.isAssignableFrom(rawClaim.getClass())) {
         return OAuthBearerValidationResult.newSuccess();
+      }
     }
-    return OAuthBearerValidationResult.newFailure(String.format("The %s claim had the incorrect type: %s",
+    return OAuthBearerValidationResult.newFailure(
+      String.format("The %s claim had the incorrect type: %s",
       claimName, rawClaim.getClass().getSimpleName()));
   }
 
@@ -76,8 +79,9 @@ public final class OAuthBearerValidationUtils {
    * @throws OAuthBearerConfigException
    *             if the given allowable clock skew is negative
    */
-  public static OAuthBearerValidationResult validateIssuedAt(OAuthBearerSignedJwt jwt, boolean required,
-    long whenCheckTimeMs, int allowableClockSkewMs) throws OAuthBearerConfigException {
+  public static OAuthBearerValidationResult validateIssuedAt(OAuthBearerSignedJwt jwt,
+    boolean required, long whenCheckTimeMs, int allowableClockSkewMs)
+    throws OAuthBearerConfigException {
     Number value;
     try {
       value = Objects.requireNonNull(jwt).issuedAt();
@@ -91,7 +95,8 @@ public final class OAuthBearerValidationUtils {
     double doubleValue = value.doubleValue();
     return 1000 * doubleValue > whenCheckTimeMs + confirmNonNegative(allowableClockSkewMs)
       ? OAuthBearerValidationResult.newFailure(String.format(
-      "The Issued At value (%f seconds) was after the indicated time (%d ms) plus allowable clock skew (%d ms)",
+      "The Issued At value (%f seconds) was after the indicated time (%d ms) "
+        + "plus allowable clock skew (%d ms)",
       doubleValue, whenCheckTimeMs, allowableClockSkewMs))
       : OAuthBearerValidationResult.newSuccess();
   }
@@ -113,8 +118,8 @@ public final class OAuthBearerValidationUtils {
    * @throws OAuthBearerConfigException
    *             if the given allowable clock skew is negative
    */
-  public static OAuthBearerValidationResult validateExpirationTime(OAuthBearerSignedJwt jwt, long whenCheckTimeMs,
-    int allowableClockSkewMs) throws OAuthBearerConfigException {
+  public static OAuthBearerValidationResult validateExpirationTime(OAuthBearerSignedJwt jwt,
+    long whenCheckTimeMs, int allowableClockSkewMs) throws OAuthBearerConfigException {
     Number value;
     try {
       value = Objects.requireNonNull(jwt).expirationTime();
@@ -128,7 +133,8 @@ public final class OAuthBearerValidationUtils {
     double doubleValue = value.doubleValue();
     return whenCheckTimeMs - confirmNonNegative(allowableClockSkewMs) >= 1000 * doubleValue
       ? OAuthBearerValidationResult.newFailure(String.format(
-      "The indicated time (%d ms) minus allowable clock skew (%d ms) was on or after the Expiration Time value (%f seconds)",
+      "The indicated time (%d ms) minus allowable clock skew (%d ms) "
+        + "was on or after the Expiration Time value (%f seconds)",
       whenCheckTimeMs, allowableClockSkewMs, doubleValue))
       : OAuthBearerValidationResult.newSuccess();
   }
@@ -154,9 +160,11 @@ public final class OAuthBearerValidationUtils {
     } catch (OAuthBearerIllegalTokenException e) {
       return e.reason();
     }
-    if (expirationTime != null && issuedAt != null && expirationTime.doubleValue() <= issuedAt.doubleValue()) {
+    if (expirationTime != null && issuedAt != null &&
+      expirationTime.doubleValue() <= issuedAt.doubleValue()) {
       return OAuthBearerValidationResult.newFailure(
-        String.format("The Expiration Time time (%f seconds) was not after the Issued At time (%f seconds)",
+        String.format("The Expiration Time time (%f seconds) was "
+            + "not after the Issued At time (%f seconds)",
           expirationTime.doubleValue(), issuedAt.doubleValue()));
     }
     return OAuthBearerValidationResult.newSuccess();
@@ -174,7 +182,8 @@ public final class OAuthBearerValidationUtils {
    *            will be validated
    * @return the result of the validation
    */
-  public static OAuthBearerValidationResult validateScope(OAuthBearerToken token, List<String> requiredScope) {
+  public static OAuthBearerValidationResult validateScope(OAuthBearerToken token,
+    List<String> requiredScope) {
     final Set<String> tokenScope = token.scope();
     if (requiredScope == null || requiredScope.isEmpty()) {
       return OAuthBearerValidationResult.newSuccess();
@@ -182,7 +191,8 @@ public final class OAuthBearerValidationUtils {
     for (String requiredScopeElement : requiredScope) {
       if (!tokenScope.contains(requiredScopeElement)) {
         return OAuthBearerValidationResult.newFailure(String.format(
-            "The provided scope (%s) was mising a required scope (%s).  All required scope elements: %s",
+            "The provided scope (%s) was mising a required scope (%s).  "
+              + "All required scope elements: %s",
             String.valueOf(tokenScope), requiredScopeElement, requiredScope.toString()),
           requiredScope.toString(), null);
       }
@@ -190,7 +200,8 @@ public final class OAuthBearerValidationUtils {
     return OAuthBearerValidationResult.newSuccess();
   }
 
-  private static int confirmNonNegative(int allowableClockSkewMs) throws OAuthBearerConfigException {
+  private static int confirmNonNegative(int allowableClockSkewMs)
+    throws OAuthBearerConfigException {
     if (allowableClockSkewMs < 0) {
       throw new OAuthBearerConfigException(
         String.format("Allowable clock skew must not be negative: %d", allowableClockSkewMs));
@@ -198,8 +209,10 @@ public final class OAuthBearerValidationUtils {
     return allowableClockSkewMs;
   }
 
-  private static OAuthBearerValidationResult doesNotExistResult(boolean required, String claimName) {
-    return required ? OAuthBearerValidationResult.newFailure(String.format("Required claim missing: %s", claimName))
+  private static OAuthBearerValidationResult doesNotExistResult(
+    boolean required, String claimName) {
+    return required ? OAuthBearerValidationResult.newFailure(
+      String.format("Required claim missing: %s", claimName))
       : OAuthBearerValidationResult.newSuccess();
   }
 

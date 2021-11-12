@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.auth.SaslExtensions;
 import org.apache.hadoop.hbase.security.auth.SaslExtensionsCallback;
+import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerTokenCallback;
 import org.apache.hadoop.security.token.Token;
@@ -59,7 +60,7 @@ public class OAuthBearerSaslClientAuthenticationProvider
                                  boolean fallbackAllowed,
                                  Map<String, String> saslProps) throws IOException {
     AuthenticateCallbackHandler callbackHandler = new OAuthBearerSaslClientCallbackHandler();
-    callbackHandler.configure(conf);
+    callbackHandler.configure(conf, getSaslAuthMethod().getSaslMechanism(), saslProps);
     return Sasl.createSaslClient(new String[] { getSaslAuthMethod().getSaslMechanism() }, null,
         null, SaslUtil.SASL_DEFAULT_REALM, saslProps, callbackHandler);
   }
@@ -67,9 +68,24 @@ public class OAuthBearerSaslClientAuthenticationProvider
   public static class OAuthBearerSaslClientCallbackHandler implements AuthenticateCallbackHandler {
     private static final Logger LOG =
       LoggerFactory.getLogger(OAuthBearerSaslClientCallbackHandler.class);
+    private boolean configured = false;
+
+    @Override public void configure(Configuration configs, String saslMechanism,
+      Map<String, String> saslProps) {
+      if (!OAuthBearerLoginModule.OAUTHBEARER_MECHANISM.equals(saslMechanism)) {
+        throw new IllegalArgumentException(
+          String.format("Unexpected SASL mechanism: %s", saslMechanism));
+      }
+      this.configured = true;
+    }
 
     @Override
     public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+      if (!configured) {
+        throw new RuntimeException(
+          "OAuthBearerSaslClientCallbackHandler handler must be configured first.");
+      }
+
       for (Callback callback : callbacks) {
         if (callback instanceof OAuthBearerTokenCallback) {
           handleCallback((OAuthBearerTokenCallback) callback);
@@ -133,13 +149,6 @@ public class OAuthBearerSaslClientAuthenticationProvider
           subject.getPublicCredentials(SaslExtensions.class).iterator().next();
         extensionsCallback.extensions(extensions);
       }
-    }
-
-    @Override public void configure(Configuration conf) {
-    }
-
-    @Override public void close() {
-      // empty
     }
   }
 

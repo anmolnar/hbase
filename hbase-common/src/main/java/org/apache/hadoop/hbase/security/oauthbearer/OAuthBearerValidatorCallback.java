@@ -126,8 +126,9 @@ public class OAuthBearerValidatorCallback implements Callback {
    *            the optional error openid-configuration value to set
    */
   public void error(String errorStatus, String errorScope, String errorOpenIDConfiguration) {
-    if (Objects.requireNonNull(errorStatus).isEmpty())
+    if (Objects.requireNonNull(errorStatus).isEmpty()) {
       throw new IllegalArgumentException("error status must not be empty");
+    }
     this.errorStatus = errorStatus;
     this.errorScope = errorScope;
     this.errorOpenIDConfiguration = errorOpenIDConfiguration;

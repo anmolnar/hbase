@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Public
 public class OAuthBearerSaslClient implements SaslClient {
   static final byte BYTE_CONTROL_A = (byte) 0x01;
-  private static final Logger log = LoggerFactory.getLogger(OAuthBearerSaslClient.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSaslClient.class);
   private final CallbackHandler callbackHandler;
 
   enum State {
@@ -98,16 +98,16 @@ public class OAuthBearerSaslClient implements SaslClient {
         case RECEIVE_SERVER_FIRST_MESSAGE:
           if (challenge != null && challenge.length != 0) {
             String jsonErrorResponse = new String(challenge, StandardCharsets.UTF_8);
-            if (log.isDebugEnabled()) {
-              log.debug("Sending %%x01 response to server after receiving an error: {}",
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Sending %%x01 response to server after receiving an error: {}",
                 jsonErrorResponse);
             }
             setState(State.RECEIVE_SERVER_MESSAGE_AFTER_FAILURE);
             return new byte[] {BYTE_CONTROL_A};
           }
           callbackHandler().handle(new Callback[] {callback});
-          if (log.isDebugEnabled()) {
-            log.debug("Successfully authenticated as {}", callback.token().principalName());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Successfully authenticated as {}", callback.token().principalName());
           }
           setState(State.COMPLETE);
           return null;
@@ -157,7 +157,7 @@ public class OAuthBearerSaslClient implements SaslClient {
   }
 
   private void setState(State state) {
-    log.debug("Setting SASL/{} client state to {}", OAuthBearerLoginModule.OAUTHBEARER_MECHANISM, state);
+    LOG.debug("Setting SASL/{} client state to {}", OAuthBearerLoginModule.OAUTHBEARER_MECHANISM, state);
     this.state = state;
   }
 
@@ -166,7 +166,7 @@ public class OAuthBearerSaslClient implements SaslClient {
     try {
       callbackHandler().handle(new Callback[] {extensionsCallback});
     } catch (UnsupportedCallbackException e) {
-      log.debug("Extensions callback is not supported by client callback handler {}, no extensions will be added",
+      LOG.debug("Extensions callback is not supported by client callback handler {}, no extensions will be added",
         callbackHandler());
     } catch (Exception e) {
       throw new SaslException("SASL extensions could not be obtained", e);

@@ -42,7 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@code SaslServer} implementation for SASL/OAUTHBEARER in Kafka. An instance
+ * {@code SaslServer} implementation for SASL/OAUTHBEARER in HBase. An instance
  * of {@link OAuthBearerToken} is available upon successful authentication via
  * the negotiated property "{@code OAUTHBEARER.token}"; the token could be used
  * in a custom authorizer (to authorize based on JWT claims rather than ACLs,
@@ -86,8 +86,6 @@ public class OAuthBearerSaslServer implements SaslServer {
   @Override
   public byte[] evaluateResponse(byte[] response) throws SaslException, SaslAuthenticationException {
     try {
-      LOG.debug("SASL server evaluate response started");
-
       if (response.length == 1 && response[0] == OAuthBearerSaslClient.BYTE_CONTROL_A && errorMessage != null) {
         LOG.error("Received %x01 response from client after it received our error");
         throw new SaslAuthenticationException(errorMessage);
@@ -95,18 +93,15 @@ public class OAuthBearerSaslServer implements SaslServer {
       errorMessage = null;
 
       OAuthBearerClientInitialResponse clientResponse;
-      try {
-        clientResponse = new OAuthBearerClientInitialResponse(response);
-      } catch (SaslException e) {
-        LOG.debug(e.getMessage());
-        throw e;
-      }
+      clientResponse = new OAuthBearerClientInitialResponse(response);
 
       return process(clientResponse.tokenValue(), clientResponse.authorizationId(), clientResponse.extensions());
+    } catch (SaslAuthenticationException e) {
+      LOG.error("SASL authentication error: {}", e.getMessage());
     } catch (Exception e) {
       LOG.error("SASL server problem", e);
-      return null;
     }
+    return null;
   }
 
   @Override
@@ -236,14 +231,15 @@ public class OAuthBearerSaslServer implements SaslServer {
   }
 
   public static String[] mechanismNamesCompatibleWithPolicy(Map<String, ?> props) {
-    return props != null && "true".equals(String.valueOf(props.get(Sasl.POLICY_NOPLAINTEXT))) ? new String[] {}
+    return props != null && "true".equals(String.valueOf(props.get(Sasl.POLICY_NOPLAINTEXT)))
+      ? new String[] {}
       : new String[] { OAuthBearerLoginModule.OAUTHBEARER_MECHANISM};
   }
 
   public static class OAuthBearerSaslServerFactory implements SaslServerFactory {
     @Override
-    public SaslServer createSaslServer(String mechanism, String protocol, String serverName, Map<String, ?> props,
-      CallbackHandler callbackHandler) {
+    public SaslServer createSaslServer(String mechanism, String protocol, String serverName,
+      Map<String, ?> props, CallbackHandler callbackHandler) {
       String[] mechanismNamesCompatibleWithPolicy = getMechanismNames(props);
       for (String s : mechanismNamesCompatibleWithPolicy) {
         if (s.equals(mechanism)) {

@@ -24,11 +24,13 @@ import java.net.URL;
 import java.text.ParseException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerExtensionsValidatorCallback;
+import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.hadoop.util.Time;
@@ -54,6 +56,11 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
 
   @Override
   public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
+    if (!configured) {
+      throw new RuntimeException(
+        "OAuthBearerSignedJwtValidatorCallbackHandler handler be configured first.");
+    }
+
     for (Callback callback : callbacks) {
       if (callback instanceof OAuthBearerValidatorCallback) {
         OAuthBearerValidatorCallback validationCallback = (OAuthBearerValidatorCallback) callback;
@@ -77,26 +84,25 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     }
   }
 
-  @Override public void configure(Configuration conf) {
-    this.hBaseConfiguration = conf;
+  @Override public void configure(Configuration configs, String saslMechanism,
+    Map<String, String> saslProps) {
+    if (!OAuthBearerLoginModule.OAUTHBEARER_MECHANISM.equals(saslMechanism)) {
+      throw new IllegalArgumentException(
+        String.format("Unexpected SASL mechanism: %s", saslMechanism));
+    }
+
+    this.hBaseConfiguration = configs;
+
     try {
       loadJwkSet();
     } catch (IOException | ParseException e) {
       throw new RuntimeException("Unable to initialize JWK Set", e);
     }
+
     configured = true;
   }
 
-  @Override
-  public void close() {
-    // empty
-  }
-
   private void handleCallback(OAuthBearerValidatorCallback callback) {
-    if (!configured) {
-      throw new RuntimeException("Callback handler be configured first.");
-    }
-
     String tokenValue = callback.tokenValue();
     if (tokenValue == null) {
       throw new IllegalArgumentException("Callback missing required token value");
@@ -162,7 +168,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
 
     if (Utils.isBlank(jwksFile) && Utils.isBlank(jwksUrl)) {
       throw new RuntimeException("Failed to initialize JWKS db. "
-        + "URL or File must be specified in the config.");
+        + JWKS_FILE + " or " + JWKS_URL + " must be specified in the config.");
     }
 
     if (!Utils.isBlank(jwksFile)) {

@@ -41,6 +41,7 @@ public class OAuthBearerSaslServerAuthenticationProvider
   private static final Logger LOG = LoggerFactory.getLogger(
     OAuthBearerSaslServerAuthenticationProvider.class);
   private Configuration hbaseConfiguration;
+  private boolean initialized = false;
 
   static {
     OAuthBearerSaslServerProvider.initialize(); // not part of public API
@@ -49,11 +50,17 @@ public class OAuthBearerSaslServerAuthenticationProvider
 
   @Override public void init(Configuration conf) throws IOException {
     this.hbaseConfiguration = conf;
+    this.initialized = true;
   }
 
   @Override public AttemptingUserProvidingSaslServer createServer(
     SecretManager<TokenIdentifier> secretManager, Map<String, String> saslProps)
     throws IOException {
+
+    if (!initialized) {
+      throw new RuntimeException(
+        "OAuthBearerSaslServerAuthenticationProvider must be initialized first.");
+    }
 
     UserGroupInformation current = UserGroupInformation.getCurrentUser();
     String fullName = current.getUserName();
@@ -64,8 +71,10 @@ public class OAuthBearerSaslServerAuthenticationProvider
       return current.doAs(new PrivilegedExceptionAction<AttemptingUserProvidingSaslServer>() {
         @Override
         public AttemptingUserProvidingSaslServer run() throws SaslException {
-          AuthenticateCallbackHandler callbackHandler = new OAuthBearerSignedJwtValidatorCallbackHandler();
-          callbackHandler.configure(hbaseConfiguration);
+          AuthenticateCallbackHandler callbackHandler =
+            new OAuthBearerSignedJwtValidatorCallbackHandler();
+          callbackHandler.configure(hbaseConfiguration, getSaslAuthMethod().getSaslMechanism(),
+            saslProps);
           return new AttemptingUserProvidingSaslServer(Sasl.createSaslServer(
             getSaslAuthMethod().getSaslMechanism(), null, null, saslProps,
             callbackHandler), () -> null);
