@@ -27,6 +27,11 @@ import org.apache.hadoop.hbase.security.auth.SaslExtensions;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.yetus.audience.InterfaceAudience;
 
+/**
+ * OAuthBearer SASL client's initial message to the server.
+ *
+ * This class has been copy-and-pasted from Kafka codebase.
+ */
 @InterfaceAudience.Public
 public class OAuthBearerClientInitialResponse {
   static final String SEPARATOR = "\u0001";
@@ -36,14 +41,16 @@ public class OAuthBearerClientInitialResponse {
   private static final String VALUE = "[\\x21-\\x7E \t\r\n]+";
 
   private static final String KVPAIRS = String.format("(%s=%s%s)*", KEY, VALUE, SEPARATOR);
-  private static final Pattern AUTH_PATTERN = Pattern.compile("(?<scheme>[\\w]+)[ ]+(?<token>[-_\\.a-zA-Z0-9]+)");
+  private static final Pattern AUTH_PATTERN =
+    Pattern.compile("(?<scheme>[\\w]+)[ ]+(?<token>[-_\\.a-zA-Z0-9]+)");
   private static final Pattern CLIENT_INITIAL_RESPONSE_PATTERN = Pattern.compile(
-    String.format("n,(a=(?<authzid>%s))?,%s(?<kvpairs>%s)%s", SASLNAME, SEPARATOR, KVPAIRS, SEPARATOR));
+    String.format("n,(a=(?<authzid>%s))?,%s(?<kvpairs>%s)%s",
+      SASLNAME, SEPARATOR, KVPAIRS, SEPARATOR));
   public static final String AUTH_KEY = "auth";
 
   private final String tokenValue;
   private final String authorizationId;
-  private SaslExtensions saslExtensions;
+  private final SaslExtensions saslExtensions;
 
   public static final Pattern EXTENSION_KEY_PATTERN = Pattern.compile(KEY);
   public static final Pattern EXTENSION_VALUE_PATTERN = Pattern.compile(VALUE);
@@ -51,23 +58,26 @@ public class OAuthBearerClientInitialResponse {
   public OAuthBearerClientInitialResponse(byte[] response) throws SaslException {
     String responseMsg = new String(response, StandardCharsets.UTF_8);
     Matcher matcher = CLIENT_INITIAL_RESPONSE_PATTERN.matcher(responseMsg);
-    if (!matcher.matches())
+    if (!matcher.matches()) {
       throw new SaslException("Invalid OAUTHBEARER client first message");
+    }
     String authzid = matcher.group("authzid");
     this.authorizationId = authzid == null ? "" : authzid;
     String kvPairs = matcher.group("kvpairs");
     Map<String, String> properties = Utils.parseMap(kvPairs, "=", SEPARATOR);
     String auth = properties.get(AUTH_KEY);
-    if (auth == null)
+    if (auth == null) {
       throw new SaslException("Invalid OAUTHBEARER client first message: 'auth' not specified");
+    }
     properties.remove(AUTH_KEY);
     SaslExtensions extensions = new SaslExtensions(properties);
     validateExtensions(extensions);
     this.saslExtensions = extensions;
 
     Matcher authMatcher = AUTH_PATTERN.matcher(auth);
-    if (!authMatcher.matches())
+    if (!authMatcher.matches()) {
       throw new SaslException("Invalid OAUTHBEARER client first message: invalid 'auth' format");
+    }
     if (!"bearer".equalsIgnoreCase(authMatcher.group("scheme"))) {
       String msg = String.format("Invalid scheme in OAUTHBEARER client first message: %s",
         matcher.group("scheme"));
@@ -88,7 +98,8 @@ public class OAuthBearerClientInitialResponse {
    *             regular expression as defined by the specification, or if the
    *             reserved {@code auth} appears as a key
    */
-  public OAuthBearerClientInitialResponse(String tokenValue, SaslExtensions extensions) throws SaslException {
+  public OAuthBearerClientInitialResponse(String tokenValue, SaslExtensions extensions)
+    throws SaslException {
     this(tokenValue, "", extensions);
   }
 
@@ -106,7 +117,8 @@ public class OAuthBearerClientInitialResponse {
    *             regular expression as defined by the specification, or if the
    *             reserved {@code auth} appears as a key
    */
-  public OAuthBearerClientInitialResponse(String tokenValue, String authorizationId, SaslExtensions extensions) throws SaslException {
+  public OAuthBearerClientInitialResponse(String tokenValue, String authorizationId,
+    SaslExtensions extensions) throws SaslException {
     this.tokenValue = Objects.requireNonNull(tokenValue, "token value must not be null");
     this.authorizationId = authorizationId == null ? "" : authorizationId;
     validateExtensions(extensions);
@@ -154,7 +166,9 @@ public class OAuthBearerClientInitialResponse {
   }
 
   /**
-   * Validates that the given extensions conform to the standard. They should also not contain the reserve key name {@link OAuthBearerClientInitialResponse#AUTH_KEY}
+   * Validates that the given extensions conform to the standard.
+   * They should also not contain the reserve key name
+   * {@link OAuthBearerClientInitialResponse#AUTH_KEY}
    *
    * @param extensions
    *            optional extensions to validate
@@ -171,7 +185,8 @@ public class OAuthBearerClientInitialResponse {
       return;
     }
     if (extensions.map().containsKey(OAuthBearerClientInitialResponse.AUTH_KEY)) {
-      throw new SaslException("Extension name " + OAuthBearerClientInitialResponse.AUTH_KEY + " is invalid");
+      throw new SaslException("Extension name " +
+        OAuthBearerClientInitialResponse.AUTH_KEY + " is invalid");
     }
 
     for (Map.Entry<String, String> entry : extensions.map().entrySet()) {
@@ -182,7 +197,8 @@ public class OAuthBearerClientInitialResponse {
         throw new SaslException("Extension name " + extensionName + " is invalid");
       }
       if (!EXTENSION_VALUE_PATTERN.matcher(extensionValue).matches()) {
-        throw new SaslException("Extension value (" + extensionValue + ") for extension " + extensionName + " is invalid");
+        throw new SaslException("Extension value (" + extensionValue + ") for extension " +
+          extensionName + " is invalid");
       }
     }
   }

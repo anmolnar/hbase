@@ -23,6 +23,9 @@ import java.util.Set;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.yetus.audience.InterfaceAudience;
 
+/**
+ * This class has been copy-and-pasted from Kafka codebase.
+ */
 @InterfaceAudience.Public
 public final class OAuthBearerValidationUtils {
   /**

@@ -63,31 +63,36 @@ public class OAuthBearerExtensionsValidatorCallback implements Callback {
   }
 
   /**
-   * @return {@link SaslExtensions} consisting of the unvalidated extension names and values that were sent by the client
+   * @return {@link SaslExtensions} consisting of the unvalidated extension names and values that
+   * were sent by the client
    */
   public SaslExtensions inputExtensions() {
     return inputExtensions;
   }
 
   /**
-   * @return an unmodifiable {@link Map} consisting of the validated and recognized by the server extension names and values
+   * @return an unmodifiable {@link Map} consisting of the validated and recognized by the server
+   * extension names and values.
    */
   public Map<String, String> validatedExtensions() {
     return Collections.unmodifiableMap(validatedExtensions);
   }
 
   /**
-   * @return An immutable {@link Map} consisting of the name-&gt;error messages of extensions which failed validation
+   * @return An immutable {@link Map} consisting of the name-&gt;error messages of extensions
+   * which failed validation
    */
   public Map<String, String> invalidExtensions() {
     return Collections.unmodifiableMap(invalidExtensions);
   }
 
   /**
-   * @return An immutable {@link Map} consisting of the extensions that have neither been validated nor invalidated
+   * @return An immutable {@link Map} consisting of the extensions that have neither been
+   * validated nor invalidated
    */
   public Map<String, String> ignoredExtensions() {
-    return Collections.unmodifiableMap(subtractMap(subtractMap(inputExtensions.map(), invalidExtensions), validatedExtensions));
+    return Collections.unmodifiableMap(
+      subtractMap(subtractMap(inputExtensions.map(), invalidExtensions), validatedExtensions));
   }
 
   /**
@@ -95,8 +100,10 @@ public class OAuthBearerExtensionsValidatorCallback implements Callback {
    * @param extensionName - the name of the extension which was validated
    */
   public void valid(String extensionName) {
-    if (!inputExtensions.map().containsKey(extensionName))
-      throw new IllegalArgumentException(String.format("Extension %s was not found in the original extensions", extensionName));
+    if (!inputExtensions.map().containsKey(extensionName)) {
+      throw new IllegalArgumentException(
+        String.format("Extension %s was not found in the original extensions", extensionName));
+    }
     validatedExtensions.put(extensionName, inputExtensions.map().get(extensionName));
   }
   /**
@@ -108,8 +115,9 @@ public class OAuthBearerExtensionsValidatorCallback implements Callback {
    *            error message describing why the validation failed
    */
   public void error(String invalidExtensionName, String errorMessage) {
-    if (Objects.requireNonNull(invalidExtensionName).isEmpty())
+    if (Objects.requireNonNull(invalidExtensionName).isEmpty()) {
       throw new IllegalArgumentException("extension name must not be empty");
+    }
     this.invalidExtensions.put(invalidExtensionName, errorMessage);
   }
 }

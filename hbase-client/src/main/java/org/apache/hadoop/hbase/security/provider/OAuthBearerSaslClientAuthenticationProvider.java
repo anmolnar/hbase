@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.security.provider;
 
+import static org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil.OAUTHBEARER_MECHANISM;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.AccessController;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.auth.SaslExtensions;
 import org.apache.hadoop.hbase.security.auth.SaslExtensionsCallback;
-import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerTokenCallback;
 import org.apache.hadoop.security.token.Token;
@@ -72,7 +72,7 @@ public class OAuthBearerSaslClientAuthenticationProvider
 
     @Override public void configure(Configuration configs, String saslMechanism,
       Map<String, String> saslProps) {
-      if (!OAuthBearerLoginModule.OAUTHBEARER_MECHANISM.equals(saslMechanism)) {
+      if (!OAUTHBEARER_MECHANISM.equals(saslMechanism)) {
         throw new IllegalArgumentException(
           String.format("Unexpected SASL mechanism: %s", saslMechanism));
       }

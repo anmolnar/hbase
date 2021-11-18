@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.security.provider;
 
+import static org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil.TOKEN_KIND;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.yetus.audience.InterfaceAudience;
 
@@ -26,7 +27,6 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Private
 public class OAuthBearerSaslAuthenticationProvider extends BuiltInSaslAuthenticationProvider {
 
-  public static final String TOKEN_KIND = "JWT_AUTH_TOKEN";
   public static final SaslAuthMethod SASL_AUTH_METHOD = new SaslAuthMethod(
       "OAUTHBEARER", (byte)83, "OAUTHBEARER", UserGroupInformation.AuthenticationMethod.TOKEN);
 

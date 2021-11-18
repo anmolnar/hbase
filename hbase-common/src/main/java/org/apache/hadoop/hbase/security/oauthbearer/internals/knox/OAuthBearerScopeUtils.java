@@ -17,12 +17,12 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
-import org.apache.yetus.audience.InterfaceAudience;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Utility class for help dealing with
@@ -31,7 +31,8 @@ import java.util.regex.Pattern;
  */
 @InterfaceAudience.Public
 public final class OAuthBearerScopeUtils {
-  private static final Pattern INDIVIDUAL_SCOPE_ITEM_PATTERN = Pattern.compile("[\\x23-\\x5B\\x5D-\\x7E\\x21]+");
+  private static final Pattern INDIVIDUAL_SCOPE_ITEM_PATTERN =
+    Pattern.compile("[\\x23-\\x5B\\x5D-\\x7E\\x21]+");
 
   /**
    * Return true if the given value meets the definition of a valid scope item as
@@ -60,12 +61,15 @@ public final class OAuthBearerScopeUtils {
    * @throws OAuthBearerConfigException
    *             if any of the individual scope values are malformed/illegal
    */
-  public static List<String> parseScope(String spaceDelimitedScope) throws OAuthBearerConfigException {
+  public static List<String> parseScope(String spaceDelimitedScope)
+    throws OAuthBearerConfigException {
     List<String> retval = new ArrayList<>();
     for (String individualScopeItem : Objects.requireNonNull(spaceDelimitedScope).split(" ")) {
       if (!individualScopeItem.isEmpty()) {
-        if (!isValidScopeItem(individualScopeItem))
-          throw new OAuthBearerConfigException(String.format("Invalid scope value: %s", individualScopeItem));
+        if (!isValidScopeItem(individualScopeItem)) {
+          throw new OAuthBearerConfigException(
+            String.format("Invalid scope value: %s", individualScopeItem));
+        }
         retval.add(individualScopeItem);
       }
     }

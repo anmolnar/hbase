@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer;
 
-import org.apache.yetus.audience.InterfaceAudience;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Public
 public final class Utils {
@@ -48,10 +48,12 @@ public final class Utils {
    *  Converts an extensions string into a {@code Map<String, String>}.
    *
    *  Example:
-   *      {@code parseMap("key=hey,keyTwo=hi,keyThree=hello", "=", ",") => { key: "hey", keyTwo: "hi", keyThree: "hello" }}
+   *      {@code parseMap("key=hey,keyTwo=hi,keyThree=hello", "=", ",") =>
+   *      { key: "hey", keyTwo: "hi", keyThree: "hello" }}
    *
    */
-  public static Map<String, String> parseMap(String mapStr, String keyValueSeparator, String elementSeparator) {
+  public static Map<String, String> parseMap(String mapStr,
+    String keyValueSeparator, String elementSeparator) {
     Map<String, String> map = new HashMap<>();
 
     if (!mapStr.isEmpty()) {
@@ -67,7 +69,8 @@ public final class Utils {
   /**
    * Given two maps (A, B), returns all the key-value pairs in A whose keys are not contained in B
    */
-  public static <K, V> Map<K, V> subtractMap(Map<? extends K, ? extends V> minuend, Map<? extends K, ? extends V> subtrahend) {
+  public static <K, V> Map<K, V> subtractMap(Map<? extends K, ? extends V> minuend,
+    Map<? extends K, ? extends V> subtrahend) {
     return minuend.entrySet().stream()
       .filter(entry -> !subtrahend.containsKey(entry.getKey()))
       .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));

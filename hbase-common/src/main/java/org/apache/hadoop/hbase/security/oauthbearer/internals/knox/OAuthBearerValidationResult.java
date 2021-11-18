@@ -22,6 +22,8 @@ import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * The result of some kind of token validation
+ *
+ * This class has been copy-and-pasted from Kafka codebase.
  */
 @InterfaceAudience.Public
 public final class OAuthBearerValidationResult implements Serializable {
@@ -63,15 +65,18 @@ public final class OAuthBearerValidationResult implements Serializable {
    *            failure
    * @return a new validation failure instance
    */
-  public static OAuthBearerValidationResult newFailure(String failureDescription, String failureScope,
-    String failureOpenIdConfig) {
-    return new OAuthBearerValidationResult(false, failureDescription, failureScope, failureOpenIdConfig);
+  public static OAuthBearerValidationResult newFailure(String failureDescription,
+    String failureScope, String failureOpenIdConfig) {
+    return new OAuthBearerValidationResult(false, failureDescription, failureScope,
+      failureOpenIdConfig);
   }
 
-  private OAuthBearerValidationResult(boolean success, String failureDescription, String failureScope,
-    String failureOpenIdConfig) {
-    if (success && (failureScope != null || failureOpenIdConfig != null))
-      throw new IllegalArgumentException("success was indicated but failure scope/OpenIdConfig were provided");
+  private OAuthBearerValidationResult(boolean success, String failureDescription,
+    String failureScope, String failureOpenIdConfig) {
+    if (success && (failureScope != null || failureOpenIdConfig != null)) {
+      throw new IllegalArgumentException(
+        "success was indicated but failure scope/OpenIdConfig were provided");
+    }
     this.success = success;
     this.failureDescription = failureDescription;
     this.failureScope = failureScope;

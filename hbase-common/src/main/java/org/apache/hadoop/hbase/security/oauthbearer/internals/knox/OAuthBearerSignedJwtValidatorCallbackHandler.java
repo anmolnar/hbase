@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
+import static org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil.OAUTHBEARER_MECHANISM;
 import com.nimbusds.jose.jwk.JWKSet;
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +31,6 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerExtensionsValidatorCallback;
-import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.hadoop.util.Time;
@@ -38,6 +38,48 @@ import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A {@code CallbackHandler} that recognizes
+ * {@link OAuthBearerValidatorCallback} and validates a secure (signed) OAuth 2
+ * bearer token (JWT).
+ *
+ * It requires a valid JWK Set to be initialized at startup which holds the available
+ * RSA public keys that JWT signature can be validated with. The Set can be initialized
+ * via an URL or a local file.
+ *
+ * It requires there to be an <code>"exp" (Expiration Time)</code>
+ * claim of type Number. If <code>"iat" (Issued At)</code> or
+ * <code>"nbf" (Not Before)</code> claims are present each must be a number that
+ * precedes the Expiration Time claim, and if both are present the Not Before
+ * claim must not precede the Issued At claim. It also accepts the following
+ * options, none of which are required:
+ * <ul>
+ * <li>{@code hbase.security.oauth.jwt.jwks.url} set to a non-empty value if you
+ * wish to initialize the JWK Set via an URL. HTTPS URLs must have valid certificates.
+ * </li>
+ * <li>{@code hbase.security.oauth.jwt.jwks.file} set to a non-empty value if you
+ * wish to initialize the JWK Set from a local JSON file.
+ * </li>
+ * <li>{@code hbase.security.oauth.jwt.principalclaim} set to a non-empty value if
+ * you wish a particular String claim holding a principal name to be checked for
+ * existence; the default is to check for the existence of the '{@code sub}'
+ * claim</li>
+ * <li>{@code hbase.security.oauth.jwt.scopeclaim} set to a custom claim name if
+ * you wish the name of the String or String List claim holding any token scope
+ * to be something other than '{@code scope}'</li>
+ * <li>{@code hbase.security.oauth.jwt.requiredscope} set to a space-delimited list of
+ * scope values if you wish the String/String List claim holding the token scope
+ * to be checked to make sure it contains certain values</li>
+ * <li>{@code hbase.security.oauth.jwt.allowableclockskewms} set to a positive integer
+ * value if you wish to allow up to some number of positive milliseconds of
+ * clock skew (the default is 0)</li>
+ * </ul>
+ *
+ * It also recognizes {@link OAuthBearerExtensionsValidatorCallback} and validates
+ * every extension passed to it.
+ *
+ * This class is based on Kafka's OAuthBearerUnsecuredValidatorCallbackHandler.
+ */
 @InterfaceAudience.Public
 public class OAuthBearerSignedJwtValidatorCallbackHandler implements AuthenticateCallbackHandler {
   private static final Logger LOG =
@@ -86,7 +128,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
 
   @Override public void configure(Configuration configs, String saslMechanism,
     Map<String, String> saslProps) {
-    if (!OAuthBearerLoginModule.OAUTHBEARER_MECHANISM.equals(saslMechanism)) {
+    if (!OAUTHBEARER_MECHANISM.equals(saslMechanism)) {
       throw new IllegalArgumentException(
         String.format("Unexpected SASL mechanism: %s", saslMechanism));
     }

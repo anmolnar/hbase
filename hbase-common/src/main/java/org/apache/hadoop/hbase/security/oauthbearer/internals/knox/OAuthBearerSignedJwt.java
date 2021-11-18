@@ -49,16 +49,14 @@ import java.util.Set;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.yetus.audience.InterfaceAudience;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Signed JWT implementation for OAuth Bearer authentication mech of SASL.
+ *
+ * This class is based on Kafka's Unsecured JWS token implementation.
  */
 @InterfaceAudience.Public
 public class OAuthBearerSignedJwt implements OAuthBearerToken {
-  private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerSignedJwt.class);
-
   private final String compactSerialization;
   private final String principalClaimName;
   private final String scopeClaimName;
@@ -217,7 +215,8 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
       return Objects.requireNonNull(type).cast(value);
     } catch (ClassCastException e) {
       throw new OAuthBearerIllegalTokenException(
-        OAuthBearerValidationResult.newFailure(String.format("The '%s' claim was not of type %s: %s",
+        OAuthBearerValidationResult.newFailure(
+          String.format("The '%s' claim was not of type %s: %s",
           claimName, type.getSimpleName(), value.getClass().getSimpleName())));
     }
   }
@@ -347,8 +346,9 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
       }
     }
     List<?> scopeClaimValue = claim(scopeClaimName, List.class);
-    if (scopeClaimValue == null || scopeClaimValue.isEmpty())
+    if (scopeClaimValue == null || scopeClaimValue.isEmpty()) {
       return Collections.emptySet();
+    }
     @SuppressWarnings("unchecked")
     List<String> stringList = (List<String>) scopeClaimValue;
     Set<String> retval = new HashSet<>();

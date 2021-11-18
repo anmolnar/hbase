@@ -91,7 +91,7 @@ public class OAuthBearerSaslServerAuthenticationProvider
   }
 
   @Override public UserGroupInformation getAuthorizedUgi(String authzId,
-    SecretManager<TokenIdentifier> secretManager) throws IOException {
+    SecretManager<TokenIdentifier> secretManager) {
     UserGroupInformation ugi = UserGroupInformation.createRemoteUser(authzId);
     ugi.setAuthenticationMethod(getSaslAuthMethod().getAuthMethod());
     return ugi;

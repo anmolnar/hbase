@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer;
 
+import java.util.Set;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
-import java.util.Set;
 
 /**
  * The <code>b64token</code> value as defined in

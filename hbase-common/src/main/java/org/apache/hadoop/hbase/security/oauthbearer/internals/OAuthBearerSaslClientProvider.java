@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals;
 
+import static org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil.OAUTHBEARER_MECHANISM;
 import java.security.Provider;
 import java.security.Security;
-import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerLoginModule;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Public
@@ -28,7 +28,7 @@ public class OAuthBearerSaslClientProvider extends Provider {
 
   protected OAuthBearerSaslClientProvider() {
     super("SASL/OAUTHBEARER Client Provider", 1.0, "SASL/OAUTHBEARER Client Provider for HBase");
-    put("SaslClientFactory." + OAuthBearerLoginModule.OAUTHBEARER_MECHANISM,
+    put("SaslClientFactory." + OAUTHBEARER_MECHANISM,
       OAuthBearerSaslClient.OAuthBearerSaslClientFactory.class.getName());
   }
 

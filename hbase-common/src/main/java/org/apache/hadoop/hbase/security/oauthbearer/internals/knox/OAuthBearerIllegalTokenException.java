@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
-import org.apache.yetus.audience.InterfaceAudience;
 import java.util.Objects;
+import org.apache.yetus.audience.InterfaceAudience;
 
 /**
  * Exception thrown when token validation fails due to a problem with the token

@@ -20,7 +20,6 @@ package org.apache.hadoop.hbase;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;

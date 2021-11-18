@@ -38,6 +38,8 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Public
 public final class OAuthBearerTokenUtil {
   private static final Logger LOG = LoggerFactory.getLogger(OAuthBearerTokenUtil.class);
+  public static final String OAUTHBEARER_MECHANISM = "OAUTHBEARER";
+  public static final String TOKEN_KIND = "JWT_AUTH_TOKEN";
 
   static {
     OAuthBearerSaslClientProvider.initialize(); // not part of public API
@@ -48,7 +50,7 @@ public final class OAuthBearerTokenUtil {
 
   public static void addTokenForUser(Configuration conf, User user) {
     try {
-      user.addToken(new Token<>(null, null, new Text("JWT_AUTH_TOKEN"), null));
+      user.addToken(new Token<>(null, null, new Text(TOKEN_KIND), null));
       user.runAs(new PrivilegedAction<Object>() {
         @Override public Object run() {
           Subject subject = Subject.getSubject(AccessController.getContext());
