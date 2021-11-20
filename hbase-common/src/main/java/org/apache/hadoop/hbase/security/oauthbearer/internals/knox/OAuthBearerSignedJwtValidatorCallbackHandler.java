@@ -92,6 +92,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   private static final String REQUIRED_SCOPE_OPTION = OPTION_PREFIX + "requiredscope";
   private static final String ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION =
     OPTION_PREFIX + "allowableclockskewms";
+  private static final String REQUIRED_AUDIENCE_OPTION = OPTION_PREFIX + "requiredaudience";
   private Configuration hBaseConfiguration;
   private JWKSet jwkSet;
   private boolean configured = false;
@@ -154,7 +155,8 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     List<String> requiredScope = requiredScope();
     int allowableClockSkewMs = allowableClockSkewMs();
     OAuthBearerSignedJwt signedJwt =
-      new OAuthBearerSignedJwt(tokenValue, principalClaimName, scopeClaimName, jwkSet);
+      new OAuthBearerSignedJwt(tokenValue, principalClaimName, scopeClaimName, requiredAudience(),
+        jwkSet);
     long now = Time.monotonicNow();
     OAuthBearerValidationUtils
       .validateClaimForExistenceAndType(signedJwt, true, principalClaimName, String.class)
@@ -185,6 +187,10 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     return Utils.isBlank(requiredSpaceDelimitedScope)
       ? Collections.emptyList()
       : OAuthBearerScopeUtils.parseScope(requiredSpaceDelimitedScope.trim());
+  }
+
+  private String requiredAudience() {
+    return hBaseConfiguration.get(REQUIRED_AUDIENCE_OPTION, "");
   }
 
   private int allowableClockSkewMs() {

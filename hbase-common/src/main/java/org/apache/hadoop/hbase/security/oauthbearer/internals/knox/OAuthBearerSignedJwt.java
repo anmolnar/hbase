@@ -32,7 +32,9 @@ import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.nimbusds.jwt.proc.JWTClaimsSetVerifier;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -66,6 +68,7 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
   private final String principalName;
   private final Long startTimeMs;
   private final JWKSet jwkSet;
+  private final String requiredAudience;
 
   /**
    * Constructor with the given principal and scope claim names
@@ -85,7 +88,8 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
    *             missing)
    */
   public OAuthBearerSignedJwt(String compactSerialization, String principalClaimName,
-    String scopeClaimName, JWKSet jwkSet) throws OAuthBearerIllegalTokenException {
+    String scopeClaimName, String requiredAudience, JWKSet jwkSet)
+    throws OAuthBearerIllegalTokenException {
     this.jwkSet = jwkSet;
     try {
       this.compactSerialization = Objects.requireNonNull(compactSerialization);
@@ -97,6 +101,8 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
       if (this.scopeClaimName.isEmpty()) {
         throw new IllegalArgumentException("Must specify a non-blank scope claim name");
       }
+
+      this.requiredAudience = requiredAudience;
 
       this.claims = validateToken(compactSerialization);
 
@@ -277,6 +283,17 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
   }
 
   /**
+   * Returns the audience of access, as per
+   * <a href="https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3">
+   *   RFC7519 Section 4.1.3</a>
+   *
+   * @return the token's (always non-null but potentially empty) expected audience.
+   */
+  public String audience() {
+    return claim("aud", String.class);
+  }
+
+  /**
    * Decode the given Base64URL-encoded value, parse the resulting JSON as a JSON
    * object, and return the map of member names to their values (each value being
    * represented as either a String, a Number, or a List of Strings).
@@ -373,6 +390,18 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
     throws BadJOSEException, JOSEException, ParseException {
     JWT jwt = JWTParser.parse(jwtToken);
     ConfigurableJWTProcessor<SecurityContext> jwtProcessor = new DefaultJWTProcessor<>();
+
+    Set<String> requiredClaims = new HashSet<>();
+    JWTClaimsSet.Builder jwtClaimsSetBuilder = new JWTClaimsSet.Builder();
+    if (!Utils.isBlank(requiredAudience)) {
+      requiredClaims.add("aud");
+      jwtClaimsSetBuilder.audience(requiredAudience);
+    }
+    JWTClaimsSetVerifier<SecurityContext> jwtClaimsSetVerifier =
+      new DefaultJWTClaimsVerifier<>(jwtClaimsSetBuilder.build(), requiredClaims);
+
+    jwtProcessor.setJWTClaimsSetVerifier(jwtClaimsSetVerifier);
+
     JWSKeySelector<SecurityContext> keySelector =
       new JWSVerificationKeySelector<>((JWSAlgorithm)jwt.getHeader().getAlgorithm(),
         new ImmutableJWKSet<>(jwkSet));
