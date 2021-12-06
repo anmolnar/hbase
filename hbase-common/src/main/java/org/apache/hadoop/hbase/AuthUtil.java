@@ -20,10 +20,10 @@ package org.apache.hadoop.hbase;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.UserProvider;
-import org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil;
 import org.apache.hadoop.hbase.util.DNS;
 import org.apache.hadoop.hbase.util.Strings;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -110,9 +110,6 @@ public final class AuthUtil {
     UserProvider provider = UserProvider.instantiate(conf);
     User user = provider.getCurrent();
     boolean securityOn = provider.isHBaseSecurityEnabled() && provider.isHadoopSecurityEnabled();
-
-    OAuthBearerTokenUtil.addTokenForUser(conf, user);
-    LOG.info("JWT token added");
 
     if (securityOn) {
       boolean fromKeytab = provider.shouldLoginFromKeytab();

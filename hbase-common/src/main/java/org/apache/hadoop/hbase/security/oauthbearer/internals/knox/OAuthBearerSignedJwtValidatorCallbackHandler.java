@@ -190,7 +190,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   }
 
   private String requiredAudience() {
-    return hBaseConfiguration.get(REQUIRED_AUDIENCE_OPTION, "");
+    return hBaseConfiguration.get(REQUIRED_AUDIENCE_OPTION);
   }
 
   private int allowableClockSkewMs() {

@@ -60,7 +60,7 @@ public class OAuthBearerSaslProviderSelector extends BuiltInProviderSelector {
       .filter((t) -> OAUTHBEARER_TOKEN_KIND_TEXT.equals(t.getKind()))
       .findFirst();
     if (optional.isPresent()) {
-      LOG.info("JWT token found!");
+      LOG.info("OAuthBearer token found in user tokens");
       return new Pair<>(oauthbearer, optional.get());
     }
 
