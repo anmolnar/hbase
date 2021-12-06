@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
 import static org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil.OAUTHBEARER_MECHANISM;
+import com.google.common.annotations.VisibleForTesting;
 import com.nimbusds.jose.jwk.JWKSet;
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.text.ParseException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import org.apache.hadoop.conf.Configuration;
@@ -143,6 +145,12 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     }
 
     configured = true;
+  }
+
+  @VisibleForTesting public void configure(Configuration configs, JWKSet jwkSet) {
+    this.hBaseConfiguration = Objects.requireNonNull(configs);
+    this.jwkSet = Objects.requireNonNull(jwkSet);
+    this.configured = true;
   }
 
   private void handleCallback(OAuthBearerValidatorCallback callback) {

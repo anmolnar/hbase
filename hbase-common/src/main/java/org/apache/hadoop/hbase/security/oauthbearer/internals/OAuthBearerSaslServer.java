@@ -54,7 +54,7 @@ public class OAuthBearerSaslServer implements SaslServer {
   private static final String NEGOTIATED_PROPERTY_KEY_TOKEN = OAUTHBEARER_MECHANISM + ".token";
   private static final String INTERNAL_ERROR_ON_SERVER =
     "Authentication could not be performed due to an internal error on the server";
-  private static final String CREDENTIAL_LIFETIME_MS_SASL_NEGOTIATED_PROPERTY_KEY =
+  static final String CREDENTIAL_LIFETIME_MS_SASL_NEGOTIATED_PROPERTY_KEY =
     "CREDENTIAL.LIFETIME.MS";
 
   private final AuthenticateCallbackHandler callbackHandler;
@@ -104,10 +104,11 @@ public class OAuthBearerSaslServer implements SaslServer {
         clientResponse.extensions());
     } catch (SaslAuthenticationException e) {
       LOG.error("SASL authentication error: {}", e.getMessage());
+      throw e;
     } catch (Exception e) {
       LOG.error("SASL server problem", e);
+      throw e;
     }
-    return null;
   }
 
   @Override
