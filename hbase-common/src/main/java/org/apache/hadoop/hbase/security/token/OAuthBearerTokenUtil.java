@@ -61,19 +61,11 @@ public final class OAuthBearerTokenUtil {
             return encodedToken;
           }
 
-          @Override public Set<String> scope() {
-            return null;
-          }
-
           @Override public long lifetimeMs() {
             return 0;
           }
 
           @Override public String principalName() {
-            return null;
-          }
-
-          @Override public Long startTimeMs() {
             return null;
           }
         };

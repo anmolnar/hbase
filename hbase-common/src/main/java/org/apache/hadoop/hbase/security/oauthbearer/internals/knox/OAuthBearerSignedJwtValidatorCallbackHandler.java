@@ -18,14 +18,11 @@
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
 import static org.apache.hadoop.hbase.security.token.OAuthBearerTokenUtil.OAUTHBEARER_MECHANISM;
-import com.google.common.annotations.VisibleForTesting;
 import com.nimbusds.jose.jwk.JWKSet;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.text.ParseException;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.security.auth.callback.Callback;
@@ -35,7 +32,6 @@ import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerExtensionsValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
-import org.apache.hadoop.util.Time;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,12 +85,9 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   private static final String OPTION_PREFIX = "hbase.security.oauth.jwt.";
   private static final String JWKS_URL = OPTION_PREFIX + "jwks.url";
   private static final String JWKS_FILE = OPTION_PREFIX + "jwks.file";
-  private static final String PRINCIPAL_CLAIM_NAME_OPTION = OPTION_PREFIX + "principalclaim";
-  private static final String SCOPE_CLAIM_NAME_OPTION = OPTION_PREFIX + "scopeclaim";
-  private static final String REQUIRED_SCOPE_OPTION = OPTION_PREFIX + "requiredscope";
-  private static final String ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION =
-    OPTION_PREFIX + "allowableclockskewms";
-  private static final String REQUIRED_AUDIENCE_OPTION = OPTION_PREFIX + "requiredaudience";
+  private static final String ALLOWABLE_CLOCK_SKEW_SECONDS_OPTION =
+    OPTION_PREFIX + "allowableclockskewseconds";
+  static final String REQUIRED_AUDIENCE_OPTION = OPTION_PREFIX + "requiredaudience";
   private Configuration hBaseConfiguration;
   private JWKSet jwkSet;
   private boolean configured = false;
@@ -147,7 +140,8 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     configured = true;
   }
 
-  @VisibleForTesting public void configure(Configuration configs, JWKSet jwkSet) {
+  @InterfaceAudience.Private
+  public void configure(Configuration configs, JWKSet jwkSet) {
     this.hBaseConfiguration = Objects.requireNonNull(configs);
     this.jwkSet = Objects.requireNonNull(jwkSet);
     this.configured = true;
@@ -158,64 +152,33 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     if (tokenValue == null) {
       throw new IllegalArgumentException("Callback missing required token value");
     }
-    String principalClaimName = principalClaimName();
-    String scopeClaimName = scopeClaimName();
-    List<String> requiredScope = requiredScope();
-    int allowableClockSkewMs = allowableClockSkewMs();
     OAuthBearerSignedJwt signedJwt =
-      new OAuthBearerSignedJwt(tokenValue, principalClaimName, scopeClaimName, requiredAudience(),
-        jwkSet);
-    long now = Time.monotonicNow();
-    OAuthBearerValidationUtils
-      .validateClaimForExistenceAndType(signedJwt, true, principalClaimName, String.class)
-      .throwExceptionIfFailed();
-    OAuthBearerValidationUtils.validateIssuedAt(signedJwt, false, now, allowableClockSkewMs)
-      .throwExceptionIfFailed();
-    OAuthBearerValidationUtils.validateExpirationTime(signedJwt, now, allowableClockSkewMs)
-      .throwExceptionIfFailed();
-    OAuthBearerValidationUtils.validateTimeConsistency(signedJwt).throwExceptionIfFailed();
-    OAuthBearerValidationUtils.validateScope(signedJwt, requiredScope).throwExceptionIfFailed();
+      new OAuthBearerSignedJwt(tokenValue, requiredAudience(), jwkSet, allowableClockSkewSeconds());
     LOG.info("Successfully validated token with principal {}: {}", signedJwt.principalName(),
       signedJwt.claims());
     callback.token(signedJwt);
-  }
-
-  private String principalClaimName() {
-    String principalClaimNameValue = hBaseConfiguration.get(PRINCIPAL_CLAIM_NAME_OPTION);
-    return Utils.isBlank(principalClaimNameValue) ? "sub" : principalClaimNameValue.trim();
-  }
-
-  private String scopeClaimName() {
-    String scopeClaimNameValue = hBaseConfiguration.get(SCOPE_CLAIM_NAME_OPTION);
-    return Utils.isBlank(scopeClaimNameValue) ? "scope" : scopeClaimNameValue.trim();
-  }
-
-  private List<String> requiredScope() {
-    String requiredSpaceDelimitedScope = hBaseConfiguration.get(REQUIRED_SCOPE_OPTION);
-    return Utils.isBlank(requiredSpaceDelimitedScope)
-      ? Collections.emptyList()
-      : OAuthBearerScopeUtils.parseScope(requiredSpaceDelimitedScope.trim());
   }
 
   private String requiredAudience() {
     return hBaseConfiguration.get(REQUIRED_AUDIENCE_OPTION);
   }
 
-  private int allowableClockSkewMs() {
-    String allowableClockSkewMsValue = hBaseConfiguration.get(ALLOWABLE_CLOCK_SKEW_MILLIS_OPTION);
-    int allowableClockSkewMs = 0;
+  private int allowableClockSkewSeconds() {
+    String allowableClockSkewSecondsValue = hBaseConfiguration.get(
+      ALLOWABLE_CLOCK_SKEW_SECONDS_OPTION);
+    int allowableClockSkewSeconds = 0;
     try {
-      allowableClockSkewMs = Utils.isBlank(allowableClockSkewMsValue)
-        ? 0 : Integer.parseInt(allowableClockSkewMsValue.trim());
+      allowableClockSkewSeconds = Utils.isBlank(allowableClockSkewSecondsValue)
+        ? 0 : Integer.parseInt(allowableClockSkewSecondsValue.trim());
     } catch (NumberFormatException e) {
       throw new OAuthBearerConfigException(e.getMessage(), e);
     }
-    if (allowableClockSkewMs < 0) {
+    if (allowableClockSkewSeconds < 0) {
       throw new OAuthBearerConfigException(
-        String.format("Allowable clock skew millis must not be negative: %s",
-          allowableClockSkewMsValue));
+        String.format("Allowable clock skew seconds must not be negative: %s",
+          allowableClockSkewSecondsValue));
     }
-    return allowableClockSkewMs;
+    return allowableClockSkewSeconds;
   }
 
   private void loadJwkSet() throws IOException, ParseException {

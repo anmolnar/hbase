@@ -17,26 +17,18 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals;
 
+import static org.apache.hadoop.hbase.security.oauthbearer.JwtTestUtils.USER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JOSEObjectType;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.RSASSASigner;
-import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
-import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import javax.security.auth.callback.Callback;
@@ -45,6 +37,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.exceptions.SaslAuthenticationException;
 import org.apache.hadoop.hbase.security.auth.AuthenticateCallbackHandler;
 import org.apache.hadoop.hbase.security.auth.SaslExtensions;
+import org.apache.hadoop.hbase.security.oauthbearer.JwtTestUtils;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerExtensionsValidatorCallback;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerTokenMock;
@@ -55,22 +48,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class OAuthBearerSaslServerTest {
-  private static final String USER = "user";
   private static final Configuration CONFIGS;
+  private static final AuthenticateCallbackHandler EXTENSIONS_VALIDATOR_CALLBACK_HANDLER;
   static {
     CONFIGS = new Configuration();
-  }
-  private static final OAuthBearerSignedJwtValidatorCallbackHandler VALIDATOR_CALLBACK_HANDLER;
-  private static final AuthenticateCallbackHandler EXTENSIONS_VALIDATOR_CALLBACK_HANDLER;
-
-  private static String JWT = null;
-  private static JWK KEY = null;
-
-  static {
-    setupSignedJwt();
-    VALIDATOR_CALLBACK_HANDLER = new OAuthBearerSignedJwtValidatorCallbackHandler();
-    VALIDATOR_CALLBACK_HANDLER.configure(CONFIGS, new JWKSet(KEY));
-    // only validate extensions "firstKey" and "secondKey"
     EXTENSIONS_VALIDATOR_CALLBACK_HANDLER = new OAuthBearerSignedJwtValidatorCallbackHandler() {
       @Override
       public void handle(Callback[] callbacks) throws UnsupportedCallbackException {
@@ -91,11 +72,19 @@ public class OAuthBearerSaslServerTest {
       }
     };
   }
+
+  private String JWT;
   private OAuthBearerSaslServer saslServer;
 
   @Before
-  public void setUp() {
-    saslServer = new OAuthBearerSaslServer(VALIDATOR_CALLBACK_HANDLER);
+  public void setUp() throws JOSEException {
+    RSAKey rsaKey = JwtTestUtils.generateRSAKey();
+    JWT = JwtTestUtils.createSignedJwt(rsaKey);
+    OAuthBearerSignedJwtValidatorCallbackHandler validatorCallbackHandler =
+      new OAuthBearerSignedJwtValidatorCallbackHandler();
+    validatorCallbackHandler.configure(CONFIGS, new JWKSet(rsaKey));
+    // only validate extensions "firstKey" and "secondKey"
+    saslServer = new OAuthBearerSaslServer(validatorCallbackHandler);
   }
 
   @Test
@@ -230,29 +219,5 @@ public class OAuthBearerSaslServerTest {
     String tokenValue = compactSerialization + (illegalToken ? "AB" : "");
     return new OAuthBearerClientInitialResponse(tokenValue, authorizationId,
       new SaslExtensions(customExtensions)).toBytes();
-  }
-
-  private static void setupSignedJwt() {
-    try {
-      RSAKeyGenerator rsaKeyGenerator = new RSAKeyGenerator(2048);
-      RSAKey rsaKey = rsaKeyGenerator.keyID("1").generate();
-      KEY = rsaKey;
-      JWSHeader jwsHeader =
-        new JWSHeader.Builder(JWSAlgorithm.RS256)
-          .type(JOSEObjectType.JWT)
-          .keyID(rsaKey.getKeyID())
-          .build();
-      JWTClaimsSet payload = new JWTClaimsSet.Builder()
-        .issuer("me")
-        .audience("you")
-        .subject(USER)
-        .expirationTime(new Date())
-        .build();
-      SignedJWT signedJwt = new SignedJWT(jwsHeader, payload);
-      signedJwt.sign(new RSASSASigner(rsaKey));
-      JWT = signedJwt.serialize();
-    } catch (JOSEException e) {
-      throw new RuntimeException(e);
-    }
   }
 }

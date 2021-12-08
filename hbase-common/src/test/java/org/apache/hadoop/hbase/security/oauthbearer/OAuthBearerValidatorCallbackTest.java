@@ -20,8 +20,6 @@ package org.apache.hadoop.hbase.security.oauthbearer;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import java.util.Collections;
-import java.util.Set;
 import org.junit.Test;
 
 public class OAuthBearerValidatorCallbackTest {
@@ -29,16 +27,6 @@ public class OAuthBearerValidatorCallbackTest {
     @Override
     public String value() {
       return "value";
-    }
-
-    @Override
-    public Long startTimeMs() {
-      return null;
-    }
-
-    @Override
-    public Set<String> scope() {
-      return Collections.emptySet();
     }
 
     @Override

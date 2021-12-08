@@ -42,16 +42,6 @@ public class OAuthBearerSaslClientCallbackHandlerTest {
       }
 
       @Override
-      public Long startTimeMs() {
-        return null;
-      }
-
-      @Override
-      public Set<String> scope() {
-        return null;
-      }
-
-      @Override
       public String principalName() {
         return null;
       }

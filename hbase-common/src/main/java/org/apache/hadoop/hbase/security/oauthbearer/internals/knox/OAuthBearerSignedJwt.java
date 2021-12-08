@@ -34,7 +34,6 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
-import com.nimbusds.jwt.proc.JWTClaimsSetVerifier;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -60,25 +59,37 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class OAuthBearerSignedJwt implements OAuthBearerToken {
   private final String compactSerialization;
-  private final String principalClaimName;
-  private final String scopeClaimName;
   private final JWTClaimsSet claims;
-  private final Set<String> scope;
   private final long lifetime;
-  private final String principalName;
-  private final Long startTimeMs;
   private final JWKSet jwkSet;
+  private final int maxClockSkewSeconds;
   private final String requiredAudience;
 
   /**
-   * Constructor with the given principal and scope claim names
+   * Constructor with the given audience and maximum clock skew
    *
    * @param compactSerialization
    *            the compact serialization to parse as a signed JWT
-   * @param principalClaimName
-   *            the required principal claim name
-   * @param scopeClaimName
-   *            the required scope claim name
+   * @param requiredAudience
+   *            the audience which this JWT should be issued to
+   * @param jwkSet
+   *            the key set which the signature of this JWT should be verified with
+   */
+  public OAuthBearerSignedJwt(String compactSerialization, String requiredAudience, JWKSet jwkSet) {
+    this(compactSerialization, requiredAudience, jwkSet, 0);
+  }
+
+  /**
+   * Constructor with the given audience and maximum clock skew
+   *
+   * @param compactSerialization
+   *            the compact serialization to parse as a signed JWT
+   * @param requiredAudience
+   *            the audience which this JWT should be issued to
+   * @param jwkSet
+   *            the key set which the signature of this JWT should be verified with
+   * @param maxClockSkewSeconds
+   *            maximum allowed clock skew in seconds
    * @throws OAuthBearerIllegalTokenException
    *             if the compact serialization is not a valid JWT
    *             (meaning it did not have 3 dot-separated Base64URL sections
@@ -87,39 +98,27 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
    *             after decoding; or the mandatory '{@code alg}' header value is
    *             missing)
    */
-  public OAuthBearerSignedJwt(String compactSerialization, String principalClaimName,
-    String scopeClaimName, String requiredAudience, JWKSet jwkSet)
+  public OAuthBearerSignedJwt(String compactSerialization, String requiredAudience, JWKSet jwkSet,
+    int maxClockSkewSeconds)
     throws OAuthBearerIllegalTokenException {
     this.jwkSet = jwkSet;
+    this.maxClockSkewSeconds = maxClockSkewSeconds;
     try {
       this.compactSerialization = Objects.requireNonNull(compactSerialization);
-      this.principalClaimName = Objects.requireNonNull(principalClaimName).trim();
-      if (this.principalClaimName.isEmpty()) {
-        throw new IllegalArgumentException("Must specify a non-blank principal claim name");
-      }
-      this.scopeClaimName = Objects.requireNonNull(scopeClaimName).trim();
-      if (this.scopeClaimName.isEmpty()) {
-        throw new IllegalArgumentException("Must specify a non-blank scope claim name");
-      }
-
       this.requiredAudience = requiredAudience;
-
       this.claims = validateToken(compactSerialization);
 
-      this.scope = calculateScope();
       Number expirationTimeSeconds = expirationTime();
       if (expirationTimeSeconds == null) {
         throw new OAuthBearerIllegalTokenException(
           OAuthBearerValidationResult.newFailure("No expiration time in JWT"));
       }
       lifetime = convertClaimTimeInSecondsToMs(expirationTimeSeconds);
-      String principalName = claim(this.principalClaimName, String.class);
+      String principalName = claims.getSubject();
       if (Utils.isBlank(principalName)) {
         throw new OAuthBearerIllegalTokenException(OAuthBearerValidationResult
-          .newFailure("No principal name in JWT claim: " + this.principalClaimName));
+          .newFailure("No principal name in JWT claim"));
       }
-      this.principalName = principalName;
-      this.startTimeMs = calculateStartTimeMs();
     } catch (ParseException | BadJOSEException | JOSEException e) {
       throw new OAuthBearerIllegalTokenException(
         OAuthBearerValidationResult.newFailure("Token validation failed: " + e.getMessage()), e);
@@ -133,22 +132,12 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
 
   @Override
   public String principalName() {
-    return principalName;
-  }
-
-  @Override
-  public Long startTimeMs() {
-    return startTimeMs;
+    return claims.getSubject();
   }
 
   @Override
   public long lifetimeMs() {
     return lifetime;
-  }
-
-  @Override
-  public Set<String> scope() throws OAuthBearerIllegalTokenException {
-    return scope;
   }
 
   /**
@@ -158,49 +147,6 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
    */
   public Map<String, Object> claims() {
     return claims.getClaims();
-  }
-
-  /**
-   * Return the (always non-null/non-empty) principal claim name
-   *
-   * @return the (always non-null/non-empty) principal claim name
-   */
-  public String principalClaimName() {
-    return principalClaimName;
-  }
-
-  /**
-   * Return the (always non-null/non-empty) scope claim name
-   *
-   * @return the (always non-null/non-empty) scope claim name
-   */
-  public String scopeClaimName() {
-    return scopeClaimName;
-  }
-
-  /**
-   * Indicate if the claim exists and is the given type
-   *
-   * @param claimName
-   *            the mandatory JWT claim name
-   * @param type
-   *            the mandatory type, which should either be String.class,
-   *            Number.class, or List.class
-   * @return true if the claim exists and is the given type, otherwise false
-   */
-  public boolean isClaimType(String claimName, Class<?> type) {
-    Object value = rawClaim(claimName);
-    Objects.requireNonNull(type);
-    if (value == null) {
-      return false;
-    }
-    if (type == String.class && value instanceof String) {
-      return true;
-    }
-    if (type == Number.class && value instanceof Number) {
-      return true;
-    }
-    return type == List.class && value instanceof List;
   }
 
   /**
@@ -250,22 +196,7 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
    *             if the claim value is the incorrect type
    */
   public Number expirationTime() throws OAuthBearerIllegalTokenException {
-    Date expTime = claim("exp", Date.class);
-    return expTime.getTime();
-  }
-
-  /**
-   * Return the <a href="https://tools.ietf.org/html/rfc7519#section-4.1.6">Issued
-   * At</a> claim
-   *
-   * @return the
-   *         <a href= "https://tools.ietf.org/html/rfc7519#section-4.1.6">Issued
-   *         At</a> claim if available, otherwise null
-   * @throws OAuthBearerIllegalTokenException
-   *             if the claim value is the incorrect type
-   */
-  public Number issuedAt() throws OAuthBearerIllegalTokenException {
-    return claim("iat", Number.class);
+    return claims.getExpirationTime().getTime() / 1000L;
   }
 
   /**
@@ -293,88 +224,8 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
     return claim("aud", String.class);
   }
 
-  /**
-   * Decode the given Base64URL-encoded value, parse the resulting JSON as a JSON
-   * object, and return the map of member names to their values (each value being
-   * represented as either a String, a Number, or a List of Strings).
-   *
-   * @param split
-   *            the value to decode and parse
-   * @return the map of JSON member names to their String, Number, or String List
-   *         value
-   * @throws OAuthBearerIllegalTokenException
-   *             if the given Base64URL-encoded value cannot be decoded or parsed
-   */
-  public static Map<String, Object> toMap(String split) throws OAuthBearerIllegalTokenException {
-    Map<String, Object> retval = new HashMap<>();
-    try {
-      byte[] decode = Base64.getDecoder().decode(split);
-      JsonNode jsonNode = new ObjectMapper().readTree(decode);
-      if (jsonNode == null) {
-        throw new OAuthBearerIllegalTokenException(
-          OAuthBearerValidationResult.newFailure("malformed JSON"));
-      }
-      for (Iterator<Map.Entry<String, JsonNode>> iterator = jsonNode.fields();
-           iterator.hasNext();) {
-        Map.Entry<String, JsonNode> entry = iterator.next();
-        retval.put(entry.getKey(), convert(entry.getValue()));
-      }
-      return Collections.unmodifiableMap(retval);
-    } catch (IllegalArgumentException e) {
-      // potentially thrown by java.util.Base64.Decoder implementations
-      throw new OAuthBearerIllegalTokenException(
-        OAuthBearerValidationResult.newFailure("malformed Base64 URL encoded value"));
-    } catch (IOException e) {
-      throw new OAuthBearerIllegalTokenException(
-        OAuthBearerValidationResult.newFailure("malformed JSON"));
-    }
-  }
-
-  private static Object convert(JsonNode value) {
-    if (value.isArray()) {
-      List<String> retvalList = new ArrayList<>();
-      for (JsonNode arrayElement : value) {
-        retvalList.add(arrayElement.asText());
-      }
-      return retvalList;
-    }
-    return value.getNodeType() == JsonNodeType.NUMBER ? value.numberValue() : value.asText();
-  }
-
-  private Long calculateStartTimeMs() throws OAuthBearerIllegalTokenException {
-    Number issuedAtSeconds = claim("iat", Number.class);
-    return issuedAtSeconds == null ? null : convertClaimTimeInSecondsToMs(issuedAtSeconds);
-  }
-
   private static long convertClaimTimeInSecondsToMs(Number claimValue) {
     return Math.round(claimValue.doubleValue() * 1000);
-  }
-
-  private Set<String> calculateScope() {
-    String scopeClaimName = scopeClaimName();
-    if (isClaimType(scopeClaimName, String.class)) {
-      String scopeClaimValue = claim(scopeClaimName, String.class);
-      if (Utils.isBlank(scopeClaimValue)) {
-        return Collections.emptySet();
-      } else {
-        Set<String> retval = new HashSet<>();
-        retval.add(scopeClaimValue.trim());
-        return Collections.unmodifiableSet(retval);
-      }
-    }
-    List<?> scopeClaimValue = claim(scopeClaimName, List.class);
-    if (scopeClaimValue == null || scopeClaimValue.isEmpty()) {
-      return Collections.emptySet();
-    }
-    @SuppressWarnings("unchecked")
-    List<String> stringList = (List<String>) scopeClaimValue;
-    Set<String> retval = new HashSet<>();
-    for (String scope : stringList) {
-      if (!Utils.isBlank(scope)) {
-        retval.add(scope.trim());
-      }
-    }
-    return Collections.unmodifiableSet(retval);
   }
 
   /**
@@ -397,8 +248,10 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
       requiredClaims.add("aud");
       jwtClaimsSetBuilder.audience(requiredAudience);
     }
-    JWTClaimsSetVerifier<SecurityContext> jwtClaimsSetVerifier =
+    requiredClaims.add("sub");
+    DefaultJWTClaimsVerifier<SecurityContext> jwtClaimsSetVerifier =
       new DefaultJWTClaimsVerifier<>(jwtClaimsSetBuilder.build(), requiredClaims);
+    jwtClaimsSetVerifier.setMaxClockSkew(maxClockSkewSeconds);
 
     jwtProcessor.setJWTClaimsSetVerifier(jwtClaimsSetVerifier);
 

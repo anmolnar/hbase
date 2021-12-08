@@ -16,16 +16,9 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer;
 
-import java.util.Set;
-
 public class OAuthBearerTokenMock implements OAuthBearerToken {
   @Override
   public String value() {
-    return null;
-  }
-
-  @Override
-  public Set<String> scope() {
     return null;
   }
 
@@ -36,11 +29,6 @@ public class OAuthBearerTokenMock implements OAuthBearerToken {
 
   @Override
   public String principalName() {
-    return null;
-  }
-
-  @Override
-  public Long startTimeMs() {
     return null;
   }
 }

@@ -20,10 +20,8 @@ package org.apache.hadoop.hbase.security.oauthbearer.internals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.SaslException;
@@ -66,20 +64,12 @@ public class OAuthBearerSaslClientTest {
               return "";
             }
 
-            @Override public Set<String> scope() {
-              return Collections.emptySet();
-            }
-
             @Override public long lifetimeMs() {
               return 100;
             }
 
             @Override public String principalName() {
               return "principalName";
-            }
-
-            @Override public Long startTimeMs() {
-              return null;
             }
           });
         } else if (callback instanceof SaslExtensionsCallback) {
