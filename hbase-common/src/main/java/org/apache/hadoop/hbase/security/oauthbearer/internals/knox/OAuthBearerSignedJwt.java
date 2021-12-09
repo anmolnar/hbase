@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -34,19 +31,13 @@ import com.nimbusds.jwt.JWTParser;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
-import java.io.IOException;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
+import java.util.Calendar;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.hadoop.hbase.security.oauthbearer.OAuthBearerToken;
 import org.apache.hadoop.hbase.security.oauthbearer.Utils;
 import org.apache.yetus.audience.InterfaceAudience;
@@ -59,70 +50,25 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class OAuthBearerSignedJwt implements OAuthBearerToken {
   private final String compactSerialization;
-  private final JWTClaimsSet claims;
-  private final long lifetime;
   private final JWKSet jwkSet;
-  private final int maxClockSkewSeconds;
-  private final String requiredAudience;
+
+  private JWTClaimsSet claims;
+  private long lifetime;
+  private int maxClockSkewSeconds = 0;
+  private String requiredAudience;
+  private String requiredIssuer;
 
   /**
-   * Constructor with the given audience and maximum clock skew
+   * Constructor base64 encoded JWT token and JWK Set.
    *
    * @param compactSerialization
    *            the compact serialization to parse as a signed JWT
-   * @param requiredAudience
-   *            the audience which this JWT should be issued to
    * @param jwkSet
    *            the key set which the signature of this JWT should be verified with
    */
-  public OAuthBearerSignedJwt(String compactSerialization, String requiredAudience, JWKSet jwkSet) {
-    this(compactSerialization, requiredAudience, jwkSet, 0);
-  }
-
-  /**
-   * Constructor with the given audience and maximum clock skew
-   *
-   * @param compactSerialization
-   *            the compact serialization to parse as a signed JWT
-   * @param requiredAudience
-   *            the audience which this JWT should be issued to
-   * @param jwkSet
-   *            the key set which the signature of this JWT should be verified with
-   * @param maxClockSkewSeconds
-   *            maximum allowed clock skew in seconds
-   * @throws OAuthBearerIllegalTokenException
-   *             if the compact serialization is not a valid JWT
-   *             (meaning it did not have 3 dot-separated Base64URL sections
-   *             with a digital signature; or the header or claims
-   *             either are not valid Base 64 URL encoded values or are not JSON
-   *             after decoding; or the mandatory '{@code alg}' header value is
-   *             missing)
-   */
-  public OAuthBearerSignedJwt(String compactSerialization, String requiredAudience, JWKSet jwkSet,
-    int maxClockSkewSeconds)
-    throws OAuthBearerIllegalTokenException {
+  public OAuthBearerSignedJwt(String compactSerialization, JWKSet jwkSet) {
     this.jwkSet = jwkSet;
-    this.maxClockSkewSeconds = maxClockSkewSeconds;
-    try {
-      this.compactSerialization = Objects.requireNonNull(compactSerialization);
-      this.requiredAudience = requiredAudience;
-      this.claims = validateToken(compactSerialization);
-
-      Number expirationTimeSeconds = expirationTime();
-      if (expirationTimeSeconds == null) {
-        throw new OAuthBearerIllegalTokenException(
-          OAuthBearerValidationResult.newFailure("No expiration time in JWT"));
-      }
-      lifetime = convertClaimTimeInSecondsToMs(expirationTimeSeconds);
-      String principalName = claims.getSubject();
-      if (Utils.isBlank(principalName)) {
-        throw new OAuthBearerIllegalTokenException(OAuthBearerValidationResult
-          .newFailure("No principal name in JWT claim"));
-      }
-    } catch (ParseException | BadJOSEException | JOSEException e) {
-      throw new OAuthBearerIllegalTokenException(
-        OAuthBearerValidationResult.newFailure("Token validation failed: " + e.getMessage()), e);
-    }
+    this.compactSerialization = Objects.requireNonNull(compactSerialization);
   }
 
   @Override
@@ -150,93 +96,68 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
   }
 
   /**
-   * Extract a claim of the given type
-   *
-   * @param claimName
-   *            the mandatory JWT claim name
-   * @param type
-   *            the mandatory type, which must either be String.class,
-   *            Number.class, or List.class
-   * @return the claim if it exists, otherwise null
-   * @throws OAuthBearerIllegalTokenException
-   *             if the claim exists but is not the given type
-   */
-  public <T> T claim(String claimName, Class<T> type) throws OAuthBearerIllegalTokenException {
-    Object value = rawClaim(claimName);
-    try {
-      return Objects.requireNonNull(type).cast(value);
-    } catch (ClassCastException e) {
-      throw new OAuthBearerIllegalTokenException(
-        OAuthBearerValidationResult.newFailure(
-          String.format("The '%s' claim was not of type %s: %s",
-          claimName, type.getSimpleName(), value.getClass().getSimpleName())));
-    }
-  }
-
-  /**
-   * Extract a claim in its raw form
-   *
-   * @param claimName
-   *            the mandatory JWT claim name
-   * @return the raw claim value, if it exists, otherwise null
-   */
-  public Object rawClaim(String claimName) {
-    return claims().get(Objects.requireNonNull(claimName));
-  }
-
-  /**
-   * Return the
-   * <a href="https://tools.ietf.org/html/rfc7519#section-4.1.4">Expiration
-   * Time</a> claim
-   *
-   * @return the <a href=
-   *         "https://tools.ietf.org/html/rfc7519#section-4.1.4">Expiration
-   *         Time</a> claim if available, otherwise null
-   * @throws OAuthBearerIllegalTokenException
-   *             if the claim value is the incorrect type
-   */
-  public Number expirationTime() throws OAuthBearerIllegalTokenException {
-    return claims.getExpirationTime().getTime() / 1000L;
-  }
-
-  /**
-   * Return the
-   * <a href="https://tools.ietf.org/html/rfc7519#section-4.1.2">Subject</a> claim
-   *
-   * @return the <a href=
-   *         "https://tools.ietf.org/html/rfc7519#section-4.1.2">Subject</a> claim
-   *         if available, otherwise null
-   * @throws OAuthBearerIllegalTokenException
-   *             if the claim value is the incorrect type
-   */
-  public String subject() throws OAuthBearerIllegalTokenException {
-    return claim("sub", String.class);
-  }
-
-  /**
-   * Returns the audience of access, as per
+   * Set required audience, as per
    * <a href="https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3">
    *   RFC7519 Section 4.1.3</a>
-   *
-   * @return the token's (always non-null but potentially empty) expected audience.
    */
-  public String audience() {
-    return claim("aud", String.class);
+  public OAuthBearerSignedJwt audience(String aud) {
+    this.requiredAudience = aud;
+    return this;
   }
 
-  private static long convertClaimTimeInSecondsToMs(Number claimValue) {
-    return Math.round(claimValue.doubleValue() * 1000);
+  /**
+   * Set required issuer, as per
+   * <a href="https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.1">
+   *   RFC7519 Section 4.1.1</a>
+   */
+  public OAuthBearerSignedJwt issuer(String iss) {
+    this.requiredIssuer = iss;
+    return this;
+  }
+
+  /**
+   * Set maximum clock skew in seconds.
+   * @param value New value
+   */
+  public OAuthBearerSignedJwt maxClockSkewSeconds(int value) {
+    this.maxClockSkewSeconds = value;
+    return this;
   }
 
   /**
    * This method provides a single method for validating the JWT for use in
-   * request processing. It provides for the override of specific aspects of
-   * this implementation through submethods used within but also allows for the
-   * override of the entire token validation algorithm.
+   * request processing.
    *
-   * @param jwtToken the token to validate
-   * @return true if valid
+   * @throws OAuthBearerIllegalTokenException
+   *             if the compact serialization is not a valid JWT
+   *             (meaning it did not have 3 dot-separated Base64URL sections
+   *             with a digital signature; or the header or claims
+   *             either are not valid Base 64 URL encoded values or are not JSON
+   *             after decoding; or the mandatory '{@code alg}' header value is
+   *             missing)
    */
+  public OAuthBearerSignedJwt validate(){
+    try {
+      this.claims = validateToken(compactSerialization);
+      Number expirationTimeSeconds =
+        DateUtils.ceiling(claims.getExpirationTime(), Calendar.SECOND).getTime() / 1000L;
+      if (expirationTimeSeconds == null) {
+        throw new OAuthBearerIllegalTokenException(
+          OAuthBearerValidationResult.newFailure("No expiration time in JWT"));
+      }
+      lifetime = convertClaimTimeInSecondsToMs(expirationTimeSeconds);
+      String principalName = claims.getSubject();
+      if (Utils.isBlank(principalName)) {
+        throw new OAuthBearerIllegalTokenException(OAuthBearerValidationResult
+          .newFailure("No principal name in JWT claim"));
+      }
+      return this;
+    } catch (ParseException | BadJOSEException | JOSEException e) {
+      throw new OAuthBearerIllegalTokenException(
+        OAuthBearerValidationResult.newFailure("Token validation failed: " + e.getMessage()), e);
+    }
+  }
+
   private JWTClaimsSet validateToken(String jwtToken)
     throws BadJOSEException, JOSEException, ParseException {
     JWT jwt = JWTParser.parse(jwtToken);
@@ -244,15 +165,25 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
 
     Set<String> requiredClaims = new HashSet<>();
     JWTClaimsSet.Builder jwtClaimsSetBuilder = new JWTClaimsSet.Builder();
+
+    // Audience
     if (!Utils.isBlank(requiredAudience)) {
       requiredClaims.add("aud");
       jwtClaimsSetBuilder.audience(requiredAudience);
     }
+
+    // Issuer
+    if (!Utils.isBlank(requiredIssuer)) {
+      requiredClaims.add("iss");
+      jwtClaimsSetBuilder.issuer(requiredIssuer);
+    }
+
+    // Subject / Principal is always required
     requiredClaims.add("sub");
+
     DefaultJWTClaimsVerifier<SecurityContext> jwtClaimsSetVerifier =
       new DefaultJWTClaimsVerifier<>(jwtClaimsSetBuilder.build(), requiredClaims);
     jwtClaimsSetVerifier.setMaxClockSkew(maxClockSkewSeconds);
-
     jwtProcessor.setJWTClaimsSetVerifier(jwtClaimsSetVerifier);
 
     JWSKeySelector<SecurityContext> keySelector =
@@ -260,5 +191,9 @@ public class OAuthBearerSignedJwt implements OAuthBearerToken {
         new ImmutableJWKSet<>(jwkSet));
     jwtProcessor.setJWSKeySelector(keySelector);
     return jwtProcessor.process(jwtToken, null);
+  }
+
+  private static long convertClaimTimeInSecondsToMs(Number claimValue) {
+    return Math.round(claimValue.doubleValue() * 1000);
   }
 }

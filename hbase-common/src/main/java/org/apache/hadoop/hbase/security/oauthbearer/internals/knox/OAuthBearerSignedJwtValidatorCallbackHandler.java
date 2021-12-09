@@ -87,7 +87,8 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
   private static final String JWKS_FILE = OPTION_PREFIX + "jwks.file";
   private static final String ALLOWABLE_CLOCK_SKEW_SECONDS_OPTION =
     OPTION_PREFIX + "allowableclockskewseconds";
-  static final String REQUIRED_AUDIENCE_OPTION = OPTION_PREFIX + "requiredaudience";
+  static final String REQUIRED_AUDIENCE_OPTION = OPTION_PREFIX + "audience";
+  static final String REQUIRED_ISSUER_OPTION = OPTION_PREFIX + "issuer";
   private Configuration hBaseConfiguration;
   private JWKSet jwkSet;
   private boolean configured = false;
@@ -152,8 +153,12 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
     if (tokenValue == null) {
       throw new IllegalArgumentException("Callback missing required token value");
     }
-    OAuthBearerSignedJwt signedJwt =
-      new OAuthBearerSignedJwt(tokenValue, requiredAudience(), jwkSet, allowableClockSkewSeconds());
+    OAuthBearerSignedJwt signedJwt = new OAuthBearerSignedJwt(tokenValue, jwkSet)
+      .audience(requiredAudience())
+      .issuer(requiredIssuer())
+      .maxClockSkewSeconds(allowableClockSkewSeconds())
+      .validate();
+
     LOG.info("Successfully validated token with principal {}: {}", signedJwt.principalName(),
       signedJwt.claims());
     callback.token(signedJwt);
@@ -161,6 +166,10 @@ public class OAuthBearerSignedJwtValidatorCallbackHandler implements Authenticat
 
   private String requiredAudience() {
     return hBaseConfiguration.get(REQUIRED_AUDIENCE_OPTION);
+  }
+
+  private String requiredIssuer() {
+    return hBaseConfiguration.get(REQUIRED_ISSUER_OPTION);
   }
 
   private int allowableClockSkewSeconds() {

@@ -27,7 +27,6 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import java.util.Date;
-import java.util.List;
 import org.apache.yetus.audience.InterfaceAudience;
 
 @InterfaceAudience.Public
@@ -41,7 +40,7 @@ public final class JwtTestUtils {
   }
 
   public static String createSignedJwt(RSAKey rsaKey, String issuer, String subject,
-    Date expirationTime, Date issueTime, String audience, List<String> scope)
+    Date expirationTime, Date issueTime, String audience)
     throws JOSEException {
     JWSHeader jwsHeader =
       new JWSHeader.Builder(JWSAlgorithm.RS256)
@@ -54,7 +53,6 @@ public final class JwtTestUtils {
       .issueTime(issueTime)
       .expirationTime(expirationTime)
       .audience(audience)
-      .claim("scope", scope)
       .build();
     SignedJWT signedJwt = new SignedJWT(jwsHeader, payload);
     signedJwt.sign(new RSASSASigner(rsaKey));
@@ -93,6 +91,24 @@ public final class JwtTestUtils {
     signedJwt.sign(new RSASSASigner(rsaKey));
     return signedJwt.serialize();
   }
+
+  public static String createSignedJwtWithIssuer(RSAKey rsaKey, String iss) throws JOSEException {
+    long now = new Date().getTime();
+    JWSHeader jwsHeader =
+      new JWSHeader.Builder(JWSAlgorithm.RS256)
+        .type(JOSEObjectType.JWT)
+        .keyID(rsaKey.getKeyID())
+        .build();
+    JWTClaimsSet payload = new JWTClaimsSet.Builder()
+      .subject(USER)
+      .expirationTime(new Date(now + ONE_DAY))
+      .issuer(iss)
+      .build();
+    SignedJWT signedJwt = new SignedJWT(jwsHeader, payload);
+    signedJwt.sign(new RSASSASigner(rsaKey));
+    return signedJwt.serialize();
+  }
+
 
   private JwtTestUtils() {
     // empty

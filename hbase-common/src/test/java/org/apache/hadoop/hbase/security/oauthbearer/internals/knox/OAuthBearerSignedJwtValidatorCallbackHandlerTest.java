@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.security.oauthbearer.internals.knox;
 
 import static org.apache.hadoop.hbase.security.oauthbearer.internals.knox.OAuthBearerSignedJwtValidatorCallbackHandler.REQUIRED_AUDIENCE_OPTION;
+import static org.apache.hadoop.hbase.security.oauthbearer.internals.knox.OAuthBearerSignedJwtValidatorCallbackHandler.REQUIRED_ISSUER_OPTION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -40,6 +41,11 @@ public class OAuthBearerSignedJwtValidatorCallbackHandlerTest {
     REQUIRED_AUDIENCE_CONFIG = new HBaseConfiguration();
     REQUIRED_AUDIENCE_CONFIG.set(REQUIRED_AUDIENCE_OPTION, "test-audience");
   }
+  private static final HBaseConfiguration REQUIRED_ISSUER_CONFIG;
+  static {
+    REQUIRED_ISSUER_CONFIG = new HBaseConfiguration();
+    REQUIRED_ISSUER_CONFIG.set(REQUIRED_ISSUER_OPTION, "test-issuer");
+  }
 
   private RSAKey RSA_KEY;
 
@@ -61,7 +67,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandlerTest {
     throws UnsupportedCallbackException, JOSEException {
     Date now = new Date();
     String token = JwtTestUtils.createSignedJwt(RSA_KEY, "me", "",
-      new Date(now.getTime() + JwtTestUtils.ONE_DAY), now, "test-aud", null);
+      new Date(now.getTime() + JwtTestUtils.ONE_DAY), now, "test-aud");
     confirmFailsValidation(EMPTY_CONFIG, token);
   }
 
@@ -71,7 +77,7 @@ public class OAuthBearerSignedJwtValidatorCallbackHandlerTest {
     String token = JwtTestUtils.createSignedJwt(RSA_KEY, "me", "",
       new Date(now.getTime() - JwtTestUtils.ONE_DAY),
       new Date(now.getTime() - JwtTestUtils.ONE_DAY),
-      "test-aud", null);
+      "test-aud");
     confirmFailsValidation(EMPTY_CONFIG, token);
   }
 
@@ -94,6 +100,27 @@ public class OAuthBearerSignedJwtValidatorCallbackHandlerTest {
   public void badAudience() throws JOSEException, UnsupportedCallbackException {
     String token = JwtTestUtils.createSignedJwtWithAudience(RSA_KEY, "bad-audience");
     confirmFailsValidation(REQUIRED_AUDIENCE_CONFIG, token);
+  }
+
+  @Test
+  public void requiredIssuer() throws UnsupportedCallbackException, JOSEException {
+    String token = JwtTestUtils.createSignedJwtWithIssuer(RSA_KEY, "test-issuer");
+    Object validationResult = validationResult(REQUIRED_ISSUER_CONFIG, token);
+    assertTrue(validationResult instanceof OAuthBearerValidatorCallback);
+    assertTrue(((OAuthBearerValidatorCallback) validationResult).token()
+      instanceof OAuthBearerSignedJwt);
+  }
+
+  @Test
+  public void missingIssuer() throws JOSEException, UnsupportedCallbackException {
+    String token = JwtTestUtils.createSignedJwt(RSA_KEY);
+    confirmFailsValidation(REQUIRED_ISSUER_CONFIG, token);
+  }
+
+  @Test
+  public void badIssuer() throws JOSEException, UnsupportedCallbackException {
+    String token = JwtTestUtils.createSignedJwtWithIssuer(RSA_KEY, "bad-issuer");
+    confirmFailsValidation(REQUIRED_ISSUER_CONFIG, token);
   }
 
   private void confirmFailsValidation(HBaseConfiguration config, String tokenValue)
