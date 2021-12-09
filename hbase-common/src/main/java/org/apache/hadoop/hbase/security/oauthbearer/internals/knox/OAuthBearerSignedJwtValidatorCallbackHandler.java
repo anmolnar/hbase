@@ -58,18 +58,12 @@ import org.slf4j.LoggerFactory;
  * <li>{@code hbase.security.oauth.jwt.jwks.file} set to a non-empty value if you
  * wish to initialize the JWK Set from a local JSON file.
  * </li>
- * <li>{@code hbase.security.oauth.jwt.principalclaim} set to a non-empty value if
- * you wish a particular String claim holding a principal name to be checked for
- * existence; the default is to check for the existence of the '{@code sub}'
- * claim</li>
- * <li>{@code hbase.security.oauth.jwt.scopeclaim} set to a custom claim name if
- * you wish the name of the String or String List claim holding any token scope
- * to be something other than '{@code scope}'</li>
- * <li>{@code hbase.security.oauth.jwt.requiredscope} set to a space-delimited list of
- * scope values if you wish the String/String List claim holding the token scope
- * to be checked to make sure it contains certain values</li>
- * <li>{@code hbase.security.oauth.jwt.allowableclockskewms} set to a positive integer
- * value if you wish to allow up to some number of positive milliseconds of
+ * <li>{@code hbase.security.oauth.jwt.audience} set to a String value which
+ * you want the desired audience ("aud") the JWT to have.</li>
+ * <li>{@code hbase.security.oauth.jwt.issuer} set to a String value which
+ * you want the issuer ("iss") of the JWT has to be.</li>
+ * <li>{@code hbase.security.oauth.jwt.allowableclockskewseconds} set to a positive integer
+ * value if you wish to allow up to some number of positive seconds of
  * clock skew (the default is 0)</li>
  * </ul>
  *

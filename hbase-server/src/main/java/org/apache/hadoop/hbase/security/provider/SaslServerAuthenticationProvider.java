@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.security.provider;
 
 import java.io.IOException;
 import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseInterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
