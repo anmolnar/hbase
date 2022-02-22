@@ -20,15 +20,12 @@ package org.apache.hadoop.hbase.ipc;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.hadoop.hbase.HBaseClassTestRule;
 import org.apache.hadoop.hbase.client.RegionInfoBuilder;
 import org.apache.hadoop.hbase.exceptions.ClientExceptionsUtil;
@@ -36,13 +33,9 @@ import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.net.Address;
 import org.apache.hadoop.hbase.testclassification.ClientTests;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
-import org.apache.hadoop.hbase.util.FutureUtils;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-
-import org.apache.hbase.thirdparty.io.netty.channel.DefaultEventLoop;
-import org.apache.hbase.thirdparty.io.netty.channel.EventLoop;
 
 @Category({ ClientTests.class, SmallTests.class })
 public class TestIPCUtil {
@@ -116,46 +109,6 @@ public class TestIPCUtil {
         }
         assertThat(ioe, instanceOf(exception.getClass()));
       }
-    }
-  }
-
-  @Test
-  public void testExecute() throws IOException {
-    EventLoop eventLoop = new DefaultEventLoop();
-    MutableInt executed = new MutableInt(0);
-    MutableInt numStackTraceElements = new MutableInt(0);
-    CompletableFuture<Void> future = new CompletableFuture<>();
-    try {
-      IPCUtil.execute(eventLoop, new Runnable() {
-
-        @Override
-        public void run() {
-          int numElements = new Exception().getStackTrace().length;
-          int depth = executed.getAndIncrement();
-          if (depth <= IPCUtil.MAX_DEPTH) {
-            if (numElements <= numStackTraceElements.intValue()) {
-              future.completeExceptionally(
-                new AssertionError("should call run directly but stack trace decreased from " +
-                  numStackTraceElements.intValue() + " to " + numElements));
-              return;
-            }
-            numStackTraceElements.setValue(numElements);
-            IPCUtil.execute(eventLoop, this);
-          } else {
-            if (numElements >= numStackTraceElements.intValue()) {
-              future.completeExceptionally(
-                new AssertionError("should call eventLoop.execute to prevent stack overflow but" +
-                  " stack trace increased from " + numStackTraceElements.intValue() + " to " +
-                  numElements));
-            } else {
-              future.complete(null);
-            }
-          }
-        }
-      });
-      FutureUtils.get(future);
-    } finally {
-      eventLoop.shutdownGracefully();
     }
   }
 }

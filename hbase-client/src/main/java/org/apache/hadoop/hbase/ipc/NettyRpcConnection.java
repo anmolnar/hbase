@@ -19,7 +19,6 @@ package org.apache.hadoop.hbase.ipc;
 
 import static org.apache.hadoop.hbase.ipc.CallEvent.Type.CANCELLED;
 import static org.apache.hadoop.hbase.ipc.CallEvent.Type.TIMEOUT;
-import static org.apache.hadoop.hbase.ipc.IPCUtil.execute;
 import static org.apache.hadoop.hbase.ipc.IPCUtil.setCancelled;
 import static org.apache.hadoop.hbase.ipc.IPCUtil.toIOE;
 import java.io.IOException;
@@ -128,11 +127,9 @@ class NettyRpcConnection extends RpcConnection {
 
   @Override
   protected void callTimeout(Call call) {
-    execute(eventLoop, () -> {
-      if (channel != null) {
-        channel.pipeline().fireUserEventTriggered(new CallEvent(TIMEOUT, call));
-      }
-    });
+    if (channel != null) {
+      channel.pipeline().fireUserEventTriggered(new CallEvent(TIMEOUT, call));
+    }
   }
 
   @Override
@@ -141,7 +138,6 @@ class NettyRpcConnection extends RpcConnection {
   }
 
   private void shutdown0() {
-    assert eventLoop.inEventLoop();
     if (channel != null) {
       channel.close();
       channel = null;
@@ -150,25 +146,22 @@ class NettyRpcConnection extends RpcConnection {
 
   @Override
   public void shutdown() {
-    execute(eventLoop, this::shutdown0);
+    shutdown0();
   }
 
   @Override
   public void cleanupConnection() {
-    execute(eventLoop, () -> {
-      if (connectionHeaderPreamble != null) {
-        ReferenceCountUtil.safeRelease(connectionHeaderPreamble);
-        connectionHeaderPreamble = null;
-      }
-      if (connectionHeaderWithLength != null) {
-        ReferenceCountUtil.safeRelease(connectionHeaderWithLength);
-        connectionHeaderWithLength = null;
-      }
-    });
+    if (connectionHeaderPreamble != null) {
+      ReferenceCountUtil.safeRelease(connectionHeaderPreamble);
+      connectionHeaderPreamble = null;
+    }
+    if (connectionHeaderWithLength != null) {
+      ReferenceCountUtil.safeRelease(connectionHeaderWithLength);
+      connectionHeaderWithLength = null;
+    }
   }
 
   private void established(Channel ch) throws IOException {
-    assert eventLoop.inEventLoop();
     ChannelPipeline p = ch.pipeline();
     String addBeforeHandler = p.context(BufferCallBeforeInitHandler.class).name();
     p.addBefore(addBeforeHandler, null,
@@ -182,7 +175,6 @@ class NettyRpcConnection extends RpcConnection {
   private boolean reloginInProgress;
 
   private void scheduleRelogin(Throwable error) {
-    assert eventLoop.inEventLoop();
     if (error instanceof FallbackDisallowedException) {
       return;
     }
@@ -207,14 +199,12 @@ class NettyRpcConnection extends RpcConnection {
   }
 
   private void failInit(Channel ch, IOException e) {
-    assert eventLoop.inEventLoop();
     // fail all pending calls
     ch.pipeline().fireUserEventTriggered(BufferCallEvent.fail(e));
     shutdown0();
   }
 
   private void saslNegotiate(final Channel ch) {
-    assert eventLoop.inEventLoop();
     UserGroupInformation ticket = provider.getRealUser(remoteId.getTicket());
     if (ticket == null) {
       failInit(ch, new FatalConnectionException("ticket/user is null"));
@@ -237,7 +227,6 @@ class NettyRpcConnection extends RpcConnection {
 
       @Override
       public void operationComplete(Future<Boolean> future) throws Exception {
-        LOG.debug("SASL negotiation complete?");
         if (future.isSuccess()) {
           ChannelPipeline p = ch.pipeline();
           p.remove(SaslChallengeDecoder.class);
@@ -287,7 +276,6 @@ class NettyRpcConnection extends RpcConnection {
   }
 
   private void connect() throws UnknownHostException, InterruptedException {
-    assert eventLoop.inEventLoop();
     LOG.trace("Connecting to {}", remoteId.getAddress());
     InetSocketAddress remoteAddr = getRemoteInetAddress(rpcClient.metrics);
     Bootstrap bootstrap = new Bootstrap().group(eventLoop).channel(rpcClient.channelClass)
@@ -304,11 +292,9 @@ class NettyRpcConnection extends RpcConnection {
       .localAddress(rpcClient.localAddr)
       .remoteAddress(remoteAddr)
       .connect()
-      .sync()
       .addListener(new ChannelFutureListener() {
         @Override
         public void operationComplete(ChannelFuture future) throws Exception {
-          LOG.debug("Netty connect completed");
           Channel ch = future.channel();
           if (!future.isSuccess()) {
             failInit(ch, toIOE(future.cause()));
@@ -324,11 +310,10 @@ class NettyRpcConnection extends RpcConnection {
             established(ch);
           }
         }
-      }).channel();
+      }).sync().channel();
   }
 
   private void sendRequest0(Call call, HBaseRpcController hrc) throws IOException {
-    assert eventLoop.inEventLoop();
     if (reloginInProgress) {
       throw new IOException("Can not send request because relogin is in progress.");
     }
@@ -344,7 +329,7 @@ class NettyRpcConnection extends RpcConnection {
     }, new CancellationCallback() {
 
       @Override
-      public void run(boolean cancelled) throws IOException {
+      public void run(boolean cancelled) throws UnknownHostException {
         if (cancelled) {
           setCancelled(call);
         } else {
@@ -355,16 +340,11 @@ class NettyRpcConnection extends RpcConnection {
               e.printStackTrace();
             }
           }
-          LOG.debug("Connect done");
           scheduleTimeoutTask(call);
-
-          channel
-            .writeAndFlush(call)
+          channel.writeAndFlush(call)
             .addListener(new ChannelFutureListener() {
-
               @Override
-              public void operationComplete(ChannelFuture future) throws Exception {
-                LOG.debug("writeAndFlush completed");
+              public void operationComplete(ChannelFuture future) {
                 // Fail the call if we failed to write it out. This usually because the channel is
                 // closed. This is needed because we may shutdown the channel inside event loop and
                 // there may still be some pending calls in the event loop queue after us.
@@ -373,22 +353,18 @@ class NettyRpcConnection extends RpcConnection {
                 }
               }
             });
-
-          LOG.debug("Write And Flush is done.");
         }
       }
     });
   }
 
   @Override
-  public void sendRequest(final Call call, HBaseRpcController hrc) {
-    execute(eventLoop, () -> {
-      try {
-        sendRequest0(call, hrc);
-      } catch (Exception e) {
-        call.setException(toIOE(e));
-      }
-    });
+  public void sendRequest(final Call call, HBaseRpcController hrc) throws UnknownHostException {
+    try {
+      sendRequest0(call, hrc);
+    } catch (Exception e) {
+      call.setException(toIOE(e));
+    }
   }
 
   /**
@@ -413,7 +389,6 @@ class NettyRpcConnection extends RpcConnection {
     protected void initChannel(SocketChannel ch) throws X509Exception.SSLContextException {
       ChannelPipeline pipeline = ch.pipeline();
       initSSL(pipeline);
-      //pipeline.addLast(new LoggingHandler(LogLevel.INFO));
       pipeline.addLast("handler", new BufferCallBeforeInitHandler());
     }
 
@@ -458,35 +433,33 @@ class NettyRpcConnection extends RpcConnection {
       Unpooled.directBuffer(connectionHeaderPreamble.length).writeBytes(connectionHeaderPreamble);
 
     EventLoop eventLoop = group.next();
-    execute(eventLoop, () -> {
-      InetSocketAddress remoteAddr = InetSocketAddress.createUnresolved("127.0.0.1", 16000);
-      InternalLoggerFactory.setDefaultFactory(Log4J2LoggerFactory.INSTANCE);
-      Bootstrap bootstrap = new Bootstrap()
-        .group(group)
-        .channel(channelClass)
-        .option(ChannelOption.TCP_NODELAY, true)
-        .option(ChannelOption.SO_KEEPALIVE, true)
-        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-        .handler(
-          new HBaseClientPipelineFactory(
-            remoteAddr.getHostString(), remoteAddr.getPort(), conf));
-      bootstrap.validate();
-      Channel channel = bootstrap
-        .localAddress(null)
-        .remoteAddress(remoteAddr)
-        .connect()
-        .addListener(new ChannelFutureListener() {
-          @Override
-          public void operationComplete(ChannelFuture future) {
-            LOG.debug("Netty connect completed");
+    InetSocketAddress remoteAddr = InetSocketAddress.createUnresolved("127.0.0.1", 16000);
+    InternalLoggerFactory.setDefaultFactory(Log4J2LoggerFactory.INSTANCE);
+    Bootstrap bootstrap = new Bootstrap()
+      .group(group)
+      .channel(channelClass)
+      .option(ChannelOption.TCP_NODELAY, true)
+      .option(ChannelOption.SO_KEEPALIVE, true)
+      .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+      .handler(
+        new HBaseClientPipelineFactory(
+          remoteAddr.getHostString(), remoteAddr.getPort(), conf));
+    bootstrap.validate();
+    Channel channel = bootstrap
+      .localAddress(null)
+      .remoteAddress(remoteAddr)
+      .connect()
+      .addListener(new ChannelFutureListener() {
+        @Override
+        public void operationComplete(ChannelFuture future) {
+          LOG.debug("Netty connect completed");
 
-            Channel ch = future.channel();
-            ch.writeAndFlush(connectionPreamble.retainedDuplicate());
+          Channel ch = future.channel();
+          ch.writeAndFlush(connectionPreamble.retainedDuplicate());
 
 
-          }
-        }).channel();
-    });
+        }
+      }).channel();
 
     Thread.sleep(30000);
   }

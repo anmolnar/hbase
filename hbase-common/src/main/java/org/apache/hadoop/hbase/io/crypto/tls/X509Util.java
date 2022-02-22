@@ -156,7 +156,7 @@ public class X509Util implements Closeable, AutoCloseable {
     return result;
   }
 
-  private SSLContextAndOptions createSSLContextAndOptions() throws
+  public SSLContextAndOptions createSSLContextAndOptions() throws
     X509Exception.SSLContextException {
     KeyManager[] keyManagers = null;
     TrustManager[] trustManagers = null;
@@ -221,7 +221,8 @@ public class X509Util implements Closeable, AutoCloseable {
    *                         empty, assumes the key store is not encrypted.
    * @param keyStoreType     must be JKS, PEM, PKCS12, BCFKS or null. If null,
    *                         attempts to autodetect the key store type from
-   *                         the file extension (e.g. .jks / .pem).   * @return the key manager.
+   *                         the file extension (e.g. .jks / .pem).
+   * @return the key manager.
    * @throws X509Exception.KeyManagerException if something goes wrong.
    */
   public X509KeyManager createKeyManager(String keyStoreLocation,
@@ -334,4 +335,5 @@ public class X509Util implements Closeable, AutoCloseable {
       trustStoreFileWatcher = null;
     }
   }
+
 }

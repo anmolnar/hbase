@@ -26,7 +26,6 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
 import org.apache.hadoop.hbase.HBaseIOException;
 import org.apache.hadoop.hbase.HConstants;
@@ -40,14 +39,10 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.EnvironmentEdgeManager;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.yetus.audience.InterfaceAudience;
-
 import org.apache.hbase.thirdparty.com.google.common.base.Preconditions;
 import org.apache.hbase.thirdparty.com.google.protobuf.CodedOutputStream;
 import org.apache.hbase.thirdparty.com.google.protobuf.Message;
 import org.apache.hbase.thirdparty.io.netty.buffer.ByteBuf;
-import org.apache.hbase.thirdparty.io.netty.channel.EventLoop;
-import org.apache.hbase.thirdparty.io.netty.util.concurrent.FastThreadLocal;
-
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.CellBlockMeta;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.ExceptionResponse;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.RequestHeader;
@@ -248,35 +243,5 @@ class IPCUtil {
     call.setException(new CallCancelledException(call.toShortString() + ", waitTime="
         + (EnvironmentEdgeManager.currentTime() - call.getStartTime()) + ", rpcTimeout="
         + call.timeout));
-  }
-
-  private static final FastThreadLocal<MutableInt> DEPTH = new FastThreadLocal<MutableInt>() {
-
-    @Override
-    protected MutableInt initialValue() throws Exception {
-      return new MutableInt(0);
-    }
-  };
-
-  static final int MAX_DEPTH = 4;
-
-  static void execute(EventLoop eventLoop, Runnable action) {
-    if (eventLoop.inEventLoop()) {
-      // this is used to prevent stack overflow, you can see the same trick in netty's LocalChannel
-      // implementation.
-      MutableInt depth = DEPTH.get();
-      if (depth.intValue() < MAX_DEPTH) {
-        depth.increment();
-        try {
-          action.run();
-        } finally {
-          depth.decrement();
-        }
-      } else {
-        eventLoop.execute(action);
-      }
-    } else {
-      eventLoop.execute(action);
-    }
   }
 }
