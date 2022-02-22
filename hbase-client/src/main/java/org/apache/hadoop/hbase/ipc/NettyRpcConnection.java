@@ -22,7 +22,6 @@ import static org.apache.hadoop.hbase.ipc.CallEvent.Type.TIMEOUT;
 import static org.apache.hadoop.hbase.ipc.IPCUtil.execute;
 import static org.apache.hadoop.hbase.ipc.IPCUtil.setCancelled;
 import static org.apache.hadoop.hbase.ipc.IPCUtil.toIOE;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -30,6 +29,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.io.crypto.tls.X509Util;
 import org.apache.hadoop.hbase.ipc.BufferCallBeforeInitHandler.BufferCallEvent;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController.CancellationCallback;
 import org.apache.hadoop.hbase.security.NettyHBaseRpcConnectionHeaderHandler;
@@ -38,9 +43,9 @@ import org.apache.hadoop.hbase.security.SaslChallengeDecoder;
 import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.common.X509Exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.hbase.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hbase.thirdparty.com.google.protobuf.RpcCallback;
 import org.apache.hbase.thirdparty.io.netty.bootstrap.Bootstrap;
@@ -51,17 +56,26 @@ import org.apache.hbase.thirdparty.io.netty.channel.Channel;
 import org.apache.hbase.thirdparty.io.netty.channel.ChannelFuture;
 import org.apache.hbase.thirdparty.io.netty.channel.ChannelFutureListener;
 import org.apache.hbase.thirdparty.io.netty.channel.ChannelHandler;
+import org.apache.hbase.thirdparty.io.netty.channel.ChannelInitializer;
 import org.apache.hbase.thirdparty.io.netty.channel.ChannelOption;
 import org.apache.hbase.thirdparty.io.netty.channel.ChannelPipeline;
 import org.apache.hbase.thirdparty.io.netty.channel.EventLoop;
+import org.apache.hbase.thirdparty.io.netty.channel.EventLoopGroup;
+import org.apache.hbase.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.hbase.thirdparty.io.netty.channel.socket.SocketChannel;
+import org.apache.hbase.thirdparty.io.netty.channel.socket.nio.NioSocketChannel;
 import org.apache.hbase.thirdparty.io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import org.apache.hbase.thirdparty.io.netty.handler.ssl.SslHandler;
 import org.apache.hbase.thirdparty.io.netty.handler.timeout.IdleStateHandler;
 import org.apache.hbase.thirdparty.io.netty.handler.timeout.ReadTimeoutHandler;
 import org.apache.hbase.thirdparty.io.netty.util.ReferenceCountUtil;
+import org.apache.hbase.thirdparty.io.netty.util.concurrent.DefaultThreadFactory;
 import org.apache.hbase.thirdparty.io.netty.util.concurrent.Future;
 import org.apache.hbase.thirdparty.io.netty.util.concurrent.FutureListener;
+import org.apache.hbase.thirdparty.io.netty.util.concurrent.GenericFutureListener;
 import org.apache.hbase.thirdparty.io.netty.util.concurrent.Promise;
-
+import org.apache.hbase.thirdparty.io.netty.util.internal.logging.InternalLoggerFactory;
+import org.apache.hbase.thirdparty.io.netty.util.internal.logging.Log4J2LoggerFactory;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.ConnectionHeader;
 
 /**
@@ -216,11 +230,14 @@ class NettyRpcConnection extends RpcConnection {
       failInit(ch, e);
       return;
     }
-    ch.pipeline().addFirst(new SaslChallengeDecoder(), saslHandler);
+    //ch.pipeline().addFirst(new SaslChallengeDecoder(), saslHandler);
+    ch.pipeline().addAfter("ssl", "saslchdecoder", new SaslChallengeDecoder());
+    ch.pipeline().addAfter("saslchdecoder", "saslhandler", saslHandler);
     saslPromise.addListener(new FutureListener<Boolean>() {
 
       @Override
       public void operationComplete(Future<Boolean> future) throws Exception {
+        LOG.debug("SASL negotiation complete?");
         if (future.isSuccess()) {
           ChannelPipeline p = ch.pipeline();
           p.remove(SaslChallengeDecoder.class);
@@ -269,19 +286,29 @@ class NettyRpcConnection extends RpcConnection {
     });
   }
 
-  private void connect() throws UnknownHostException {
+  private void connect() throws UnknownHostException, InterruptedException {
     assert eventLoop.inEventLoop();
     LOG.trace("Connecting to {}", remoteId.getAddress());
     InetSocketAddress remoteAddr = getRemoteInetAddress(rpcClient.metrics);
-    this.channel = new Bootstrap().group(eventLoop).channel(rpcClient.channelClass)
+    Bootstrap bootstrap = new Bootstrap().group(eventLoop).channel(rpcClient.channelClass)
       .option(ChannelOption.TCP_NODELAY, rpcClient.isTcpNoDelay())
       .option(ChannelOption.SO_KEEPALIVE, rpcClient.tcpKeepAlive)
       .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, rpcClient.connectTO)
-      .handler(new BufferCallBeforeInitHandler()).localAddress(rpcClient.localAddr)
-      .remoteAddress(remoteAddr).connect().addListener(new ChannelFutureListener() {
+      .handler(
+        new HBaseClientPipelineFactory(
+          remoteAddr.getHostString(), remoteAddr.getPort(), conf));
 
+    bootstrap.validate();
+
+    this.channel = bootstrap
+      .localAddress(rpcClient.localAddr)
+      .remoteAddress(remoteAddr)
+      .connect()
+      .sync()
+      .addListener(new ChannelFutureListener() {
         @Override
         public void operationComplete(ChannelFuture future) throws Exception {
+          LOG.debug("Netty connect completed");
           Channel ch = future.channel();
           if (!future.isSuccess()) {
             failInit(ch, toIOE(future.cause()));
@@ -322,21 +349,32 @@ class NettyRpcConnection extends RpcConnection {
           setCancelled(call);
         } else {
           if (channel == null) {
-            connect();
-          }
-          scheduleTimeoutTask(call);
-          channel.writeAndFlush(call).addListener(new ChannelFutureListener() {
-
-            @Override
-            public void operationComplete(ChannelFuture future) throws Exception {
-              // Fail the call if we failed to write it out. This usually because the channel is
-              // closed. This is needed because we may shutdown the channel inside event loop and
-              // there may still be some pending calls in the event loop queue after us.
-              if (!future.isSuccess()) {
-                call.setException(toIOE(future.cause()));
-              }
+            try {
+              connect();
+            } catch (InterruptedException e) {
+              e.printStackTrace();
             }
-          });
+          }
+          LOG.debug("Connect done");
+          scheduleTimeoutTask(call);
+
+          channel
+            .writeAndFlush(call)
+            .addListener(new ChannelFutureListener() {
+
+              @Override
+              public void operationComplete(ChannelFuture future) throws Exception {
+                LOG.debug("writeAndFlush completed");
+                // Fail the call if we failed to write it out. This usually because the channel is
+                // closed. This is needed because we may shutdown the channel inside event loop and
+                // there may still be some pending calls in the event loop queue after us.
+                if (!future.isSuccess()) {
+                  call.setException(toIOE(future.cause()));
+                }
+              }
+            });
+
+          LOG.debug("Write And Flush is done.");
         }
       }
     });
@@ -352,4 +390,119 @@ class NettyRpcConnection extends RpcConnection {
       }
     });
   }
+
+  /**
+   * HBaseClientPipelineFactory is the netty pipeline factory for this netty
+   * connection implementation.
+   */
+  private static class HBaseClientPipelineFactory extends ChannelInitializer<SocketChannel> {
+
+    private SSLContext sslContext = null;
+    private SSLEngine sslEngine = null;
+    private final String host;
+    private final int port;
+    private final Configuration conf;
+
+    public HBaseClientPipelineFactory(String host, int port, Configuration conf) {
+      this.host = host;
+      this.port = port;
+      this.conf = conf;
+    }
+
+    @Override
+    protected void initChannel(SocketChannel ch) throws X509Exception.SSLContextException {
+      ChannelPipeline pipeline = ch.pipeline();
+      initSSL(pipeline);
+      //pipeline.addLast(new LoggingHandler(LogLevel.INFO));
+      pipeline.addLast("handler", new BufferCallBeforeInitHandler());
+    }
+
+    // The synchronized is to prevent the race on shared variable "sslEngine".
+    // Basically we only need to create it once.
+    private synchronized void initSSL(ChannelPipeline pipeline)
+      throws X509Exception.SSLContextException {
+      if (sslContext == null || sslEngine == null) {
+        try (X509Util x509Util = new X509Util(conf)) {
+          sslContext = x509Util.createSSLContextAndOptions().getSSLContext();
+          sslEngine = sslContext.createSSLEngine(host, port);
+          sslEngine.setUseClientMode(true);
+          LOG.debug("SSL engine initialized");
+        }
+      }
+      SslHandler sslHandler = new SslHandler(sslEngine);
+      sslHandler.handshakeFuture().addListener(new GenericFutureListener<Future<? super Channel>>() {
+        @Override public void operationComplete(Future<? super Channel> future) throws Exception {
+          if (future.isSuccess()) {
+            LOG.debug("SSL handshake completed on client side");
+          } else {
+            LOG.debug("Unsuccessful SSL handshake on client side");
+          }
+        }
+      });
+      pipeline.addLast("ssl", sslHandler);
+      LOG.info("SSL handler added for channel: {}", pipeline.channel());
+    }
+  }
+
+  public static void main(String[] args) throws InterruptedException {
+    System.out.println("Netty Hello World");
+    EventLoopGroup group = new NioEventLoopGroup(0,
+      new DefaultThreadFactory("RPCClient(own)-NioEventLoopGroup", true,
+        Thread.NORM_PRIORITY));
+    Class<? extends Channel> channelClass = NioSocketChannel.class;
+
+    Configuration conf = HBaseConfiguration.create();
+
+    byte[] connectionHeaderPreamble = getPreamble();
+    ByteBuf connectionPreamble =
+      Unpooled.directBuffer(connectionHeaderPreamble.length).writeBytes(connectionHeaderPreamble);
+
+    EventLoop eventLoop = group.next();
+    execute(eventLoop, () -> {
+      InetSocketAddress remoteAddr = InetSocketAddress.createUnresolved("127.0.0.1", 16000);
+      InternalLoggerFactory.setDefaultFactory(Log4J2LoggerFactory.INSTANCE);
+      Bootstrap bootstrap = new Bootstrap()
+        .group(group)
+        .channel(channelClass)
+        .option(ChannelOption.TCP_NODELAY, true)
+        .option(ChannelOption.SO_KEEPALIVE, true)
+        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+        .handler(
+          new HBaseClientPipelineFactory(
+            remoteAddr.getHostString(), remoteAddr.getPort(), conf));
+      bootstrap.validate();
+      Channel channel = bootstrap
+        .localAddress(null)
+        .remoteAddress(remoteAddr)
+        .connect()
+        .addListener(new ChannelFutureListener() {
+          @Override
+          public void operationComplete(ChannelFuture future) {
+            LOG.debug("Netty connect completed");
+
+            Channel ch = future.channel();
+            ch.writeAndFlush(connectionPreamble.retainedDuplicate());
+
+
+          }
+        }).channel();
+    });
+
+    Thread.sleep(30000);
+  }
+
+  private static byte[] getPreamble() {
+    // Assemble the preamble up in a buffer first and then send it. Writing individual elements,
+    // they are getting sent across piecemeal according to wireshark and then server is messing
+    // up the reading on occasion (the passed in stream is not buffered yet).
+
+    // Preamble is six bytes -- 'HBas' + VERSION + AUTH_CODE
+    int rpcHeaderLen = HConstants.RPC_HEADER.length;
+    byte[] preamble = new byte[rpcHeaderLen + 1];
+    System.arraycopy(HConstants.RPC_HEADER, 0, preamble, 0, rpcHeaderLen);
+    preamble[rpcHeaderLen] = HConstants.RPC_CURRENT_VERSION;
+    return preamble;
+  }
+
+
 }
