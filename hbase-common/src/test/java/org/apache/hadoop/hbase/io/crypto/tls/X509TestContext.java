@@ -31,6 +31,7 @@ import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
@@ -72,6 +73,7 @@ public final class X509TestContext {
   private File keyStorePemFile;
   private File keyStorePkcs12File;
   private File keyStoreBcfksFile;
+  private String keyStoreCName;
 
   /**
    * Constructor is intentionally private, use the Builder class instead.
@@ -85,7 +87,7 @@ public final class X509TestContext {
    * @param keyStorePassword   the password to protect the key store private key.
    */
   private X509TestContext(Configuration conf, File tempDir, KeyPair trustStoreKeyPair,
-    char[] trustStorePassword, KeyPair keyStoreKeyPair, char[] keyStorePassword)
+    char[] trustStorePassword, KeyPair keyStoreKeyPair, char[] keyStorePassword, String keyStoreCName)
     throws IOException, GeneralSecurityException, OperatorCreationException {
     if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
       throw new IllegalStateException("BC Security provider was not found");
@@ -100,6 +102,7 @@ public final class X509TestContext {
     this.trustStorePassword = requireNonNull(trustStorePassword);
     this.keyStoreKeyPair = requireNonNull(keyStoreKeyPair);
     this.keyStorePassword = requireNonNull(keyStorePassword);
+    this.keyStoreCName = keyStoreCName;
 
     createCertificates();
 
@@ -118,7 +121,7 @@ public final class X509TestContext {
   private X509TestContext(File tempDir, Configuration conf, X509Certificate trustStoreCertificate,
     char[] trustStorePassword, KeyPair trustStoreKeyPair, File trustStoreJksFile,
     File trustStorePemFile, File trustStorePkcs12File, KeyPair keyStoreKeyPair,
-    char[] keyStorePassword, X509Certificate keyStoreCertificate) {
+    char[] keyStorePassword, X509Certificate keyStoreCertificate, String keyStoreCName) {
     this.tempDir = tempDir;
     this.conf = conf;
     this.trustStoreCertificate = trustStoreCertificate;
@@ -129,6 +132,7 @@ public final class X509TestContext {
     this.trustStorePkcs12File = trustStorePkcs12File;
     this.keyStoreKeyPair = keyStoreKeyPair;
     this.keyStoreCertificate = keyStoreCertificate;
+    this.keyStoreCName = keyStoreCName;
     this.keyStorePassword = keyStorePassword;
     keyStorePkcs12File = null;
     keyStorePemFile = null;
@@ -457,7 +461,7 @@ public final class X509TestContext {
   public X509TestContext cloneWithNewKeystoreCert(X509Certificate cert) {
     return new X509TestContext(tempDir, conf, trustStoreCertificate, trustStorePassword,
       trustStoreKeyPair, trustStoreJksFile, trustStorePemFile, trustStorePkcs12File,
-      keyStoreKeyPair, keyStorePassword, cert);
+      keyStoreKeyPair, keyStorePassword, cert, keyStoreCName);
   }
 
   public void regenerateStores(X509KeyType keyStoreKeyType, X509KeyType trustStoreKeyType,
@@ -509,8 +513,12 @@ public final class X509TestContext {
       X509TestHelpers.newSelfSignedCACert(caNameBuilder.build(), trustStoreKeyPair);
 
     X500NameBuilder nameBuilder = new X500NameBuilder(BCStyle.INSTANCE);
-    nameBuilder.addRDN(BCStyle.CN,
-      MethodHandles.lookup().lookupClass().getCanonicalName() + " Zookeeper Test");
+    if (Strings.isNotBlank(keyStoreCName)) {
+      nameBuilder.addRDN(BCStyle.CN, keyStoreCName);
+    } else {
+      nameBuilder.addRDN(BCStyle.CN,
+        MethodHandles.lookup().lookupClass().getCanonicalName() + " Zookeeper Test");
+    }
     keyStoreCertificate = newCert(nameBuilder.build(), subjectAltNames);
   }
 
@@ -525,6 +533,7 @@ public final class X509TestContext {
     private char[] trustStorePassword;
     private X509KeyType keyStoreKeyType;
     private char[] keyStorePassword;
+    private String keyStoreCName = null;
 
     /**
      * Creates an empty builder with the given Configuration.
@@ -544,7 +553,7 @@ public final class X509TestContext {
       KeyPair trustStoreKeyPair = X509TestHelpers.generateKeyPair(trustStoreKeyType);
       KeyPair keyStoreKeyPair = X509TestHelpers.generateKeyPair(keyStoreKeyType);
       return new X509TestContext(conf, tempDir, trustStoreKeyPair, trustStorePassword,
-        keyStoreKeyPair, keyStorePassword);
+        keyStoreKeyPair, keyStorePassword, keyStoreCName);
     }
 
     /**
@@ -599,6 +608,16 @@ public final class X509TestContext {
      */
     public Builder setKeyStorePassword(char[] password) {
       keyStorePassword = password;
+      return this;
+    }
+
+    /**
+     * Set canonical name for the cert in the keystore. Used for X509 authentication.
+     * @param cname the canonical name.
+     * @return this Builder.
+     */
+    public Builder setKeyStoreCN(String cname) {
+      this.keyStoreCName = cname;
       return this;
     }
   }
