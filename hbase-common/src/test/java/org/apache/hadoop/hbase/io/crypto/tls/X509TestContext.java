@@ -87,8 +87,8 @@ public final class X509TestContext {
    * @param keyStorePassword   the password to protect the key store private key.
    */
   private X509TestContext(Configuration conf, File tempDir, KeyPair trustStoreKeyPair,
-    char[] trustStorePassword, KeyPair keyStoreKeyPair, char[] keyStorePassword, String keyStoreCName)
-    throws IOException, GeneralSecurityException, OperatorCreationException {
+    char[] trustStorePassword, KeyPair keyStoreKeyPair, char[] keyStorePassword,
+    String keyStoreCName) throws IOException, GeneralSecurityException, OperatorCreationException {
     if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
       throw new IllegalStateException("BC Security provider was not found");
     }

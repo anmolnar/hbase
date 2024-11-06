@@ -17,6 +17,12 @@
  */
 package org.apache.hadoop.hbase.coprocessor.example;
 
+import java.security.cert.X509Certificate;
+import java.util.Objects;
+import java.util.Optional;
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.MasterObserver;
@@ -25,25 +31,21 @@ import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessor;
 import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.RegionServerObserver;
 import org.apache.hadoop.hbase.security.AccessDeniedException;
-import javax.naming.InvalidNameException;
-import javax.naming.ldap.LdapName;
-import javax.naming.ldap.Rdn;
-import java.security.cert.X509Certificate;
-import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Example Master/RS observer to verify the login id stored in client's X509 certificate's CN.
  * Throws AccessDeniedException if it doesn't match with the authenticated userName.
  */
-public class X509AuthenticationObserver implements RegionServerCoprocessor, RegionServerObserver,
-  MasterCoprocessor, MasterObserver {
+public class X509AuthenticationObserver
+  implements RegionServerCoprocessor, RegionServerObserver, MasterCoprocessor, MasterObserver {
 
-  @Override public Optional<MasterObserver> getMasterObserver() {
+  @Override
+  public Optional<MasterObserver> getMasterObserver() {
     return Optional.of(this);
   }
 
-  @Override public Optional<RegionServerObserver> getRegionServerObserver() {
+  @Override
+  public Optional<RegionServerObserver> getRegionServerObserver() {
     return Optional.of(this);
   }
 
@@ -61,7 +63,8 @@ public class X509AuthenticationObserver implements RegionServerCoprocessor, Regi
     validateClientX509Cert(userName, clientCertificateChain[0]);
   }
 
-  @Override public void postAuthorizeRegionServerConnection(
+  @Override
+  public void postAuthorizeRegionServerConnection(
     ObserverContext<RegionServerCoprocessorEnvironment> ctx, String userName,
     X509Certificate[] clientCertificateChain) throws AccessDeniedException {
     if (clientCertificateChain == null || clientCertificateChain.length == 0) {
@@ -75,7 +78,7 @@ public class X509AuthenticationObserver implements RegionServerCoprocessor, Regi
     String dn = clientCert.getSubjectX500Principal().getName();
     try {
       LdapName ldapDN = new LdapName(dn);
-      for (Rdn rdn: ldapDN.getRdns()) {
+      for (Rdn rdn : ldapDN.getRdns()) {
         if (rdn.getType().equalsIgnoreCase("CN")) {
           if (Objects.equals(userName, rdn.getValue())) {
             return;

@@ -34,11 +34,6 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import java.io.IOException;
-import java.security.cert.X509Certificate;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
-import static org.junit.Assert.assertNotEquals;
 
 @Category({ CoprocessorTests.class, MediumTests.class })
 public class TestRpcCoprocessor {

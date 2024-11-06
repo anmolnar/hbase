@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hbase.coprocessor.example;
 
+import java.io.File;
+import java.security.Security;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseClassTestRule;
@@ -36,8 +38,6 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import java.io.File;
-import java.security.Security;
 
 @Category(MediumTests.class)
 public class X509AuthenticationExample {
@@ -82,14 +82,10 @@ public class X509AuthenticationExample {
       .getCanonicalFile();
     FileUtils.forceMkdir(tempDir);
 
-    x509TestContext = X509TestContext.newBuilder(CONF)
-      .setTempDir(tempDir)
-      .setKeyStoreKeyType(X509KeyType.RSA)
-      .setKeyStorePassword("Pa$$w0rd".toCharArray())
-      .setTrustStoreKeyType(X509KeyType.RSA)
-      .setTrustStorePassword("Pa$$w0rd".toCharArray())
-      .setKeyStoreCN(System.getProperty("user.name"))
-      .build();
+    x509TestContext = X509TestContext.newBuilder(CONF).setTempDir(tempDir)
+      .setKeyStoreKeyType(X509KeyType.RSA).setKeyStorePassword("Pa$$w0rd".toCharArray())
+      .setTrustStoreKeyType(X509KeyType.RSA).setTrustStorePassword("Pa$$w0rd".toCharArray())
+      .setKeyStoreCN(System.getProperty("user.name")).build();
     x509TestContext.setConfigurations(KeyStoreFileType.JKS, KeyStoreFileType.JKS);
 
     UTIL.startMiniCluster();
