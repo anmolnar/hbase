@@ -17,57 +17,39 @@
  */
 package org.apache.hadoop.hbase.coprocessor.example;
 
+import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.Objects;
 import java.util.Optional;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
-import org.apache.hadoop.hbase.coprocessor.MasterCoprocessor;
-import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
-import org.apache.hadoop.hbase.coprocessor.MasterObserver;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
-import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessor;
-import org.apache.hadoop.hbase.coprocessor.RegionServerCoprocessorEnvironment;
-import org.apache.hadoop.hbase.coprocessor.RegionServerObserver;
+import org.apache.hadoop.hbase.coprocessor.RpcCoprocessor;
+import org.apache.hadoop.hbase.coprocessor.RpcCoprocessorEnvironment;
+import org.apache.hadoop.hbase.coprocessor.RpcObserver;
 import org.apache.hadoop.hbase.security.AccessDeniedException;
 
 /**
- * Example Master/RS observer to verify the login id stored in client's X509 certificate's CN.
- * Throws AccessDeniedException if it doesn't match with the authenticated userName.
+ * Example RPC observer to verify the login id stored in client's X509 certificate's CN. Throws
+ * AccessDeniedException if it doesn't match with the authenticated userName.
  */
-public class X509AuthenticationObserver
-  implements RegionServerCoprocessor, RegionServerObserver, MasterCoprocessor, MasterObserver {
+public class X509AuthenticationObserver implements RpcCoprocessor, RpcObserver {
 
   @Override
-  public Optional<MasterObserver> getMasterObserver() {
+  public Optional<RpcObserver> getRpcObserver() {
     return Optional.of(this);
   }
 
   @Override
-  public Optional<RegionServerObserver> getRegionServerObserver() {
-    return Optional.of(this);
-  }
-
-  @Override
-  public void postAuthorizeMasterConnection(ObserverContext<MasterCoprocessorEnvironment> ctx,
-    String userName, X509Certificate[] clientCertificateChain) throws AccessDeniedException {
+  public void postAuthorizeConnection(ObserverContext<RpcCoprocessorEnvironment> ctx,
+    String userName, X509Certificate[] clientCertificateChain) throws IOException {
     if (clientCertificateChain == null || clientCertificateChain.length == 0) {
       // No certificate provided
       return;
     }
     if (userName.endsWith("hfs.0")) {
       // Internal (Master/RS) connection - don't check
-      return;
-    }
-    validateClientX509Cert(userName, clientCertificateChain[0]);
-  }
-
-  @Override
-  public void postAuthorizeRegionServerConnection(
-    ObserverContext<RegionServerCoprocessorEnvironment> ctx, String userName,
-    X509Certificate[] clientCertificateChain) throws AccessDeniedException {
-    if (clientCertificateChain == null || clientCertificateChain.length == 0) {
       return;
     }
     validateClientX509Cert(userName, clientCertificateChain[0]);

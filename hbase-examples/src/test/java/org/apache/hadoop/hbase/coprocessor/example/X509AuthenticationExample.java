@@ -70,9 +70,7 @@ public class X509AuthenticationExample {
     CONF.setBoolean(X509Util.HBASE_CLIENT_NETTY_TLS_ENABLED, true);
 
     // Setup co-processors
-    CONF.setStrings(CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY,
-      X509AuthenticationObserver.class.getName());
-    CONF.setStrings(CoprocessorHost.REGIONSERVER_COPROCESSOR_CONF_KEY,
+    CONF.setStrings(CoprocessorHost.RPC_COPROCESSOR_CONF_KEY,
       X509AuthenticationObserver.class.getName());
   }
 
