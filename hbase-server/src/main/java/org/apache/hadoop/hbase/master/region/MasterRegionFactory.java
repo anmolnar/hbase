@@ -54,7 +54,9 @@ public final class MasterRegionFactory {
 
   public static final String USE_HSYNC_KEY = "hbase.master.store.region.wal.hsync";
 
-  public static final String MASTER_STORE_DIR = "MasterData";
+  public static final String MASTER_STORE_DIR_CONF = "hbase.master.store.dir";
+
+  public static final String MASTER_STORE_DIR_DEFAULT = "MasterData";
 
   private static final String FLUSH_SIZE_KEY = "hbase.master.store.region.flush.size";
 
@@ -116,7 +118,7 @@ public final class MasterRegionFactory {
   public static MasterRegion create(Server server) throws IOException {
     Configuration conf = server.getConfiguration();
     MasterRegionParams params = new MasterRegionParams().server(server)
-      .regionDirName(MASTER_STORE_DIR).tableDescriptor(withTrackerConfigs(conf));
+      .regionDirName(conf.get(MASTER_STORE_DIR_CONF, MASTER_STORE_DIR_DEFAULT)).tableDescriptor(withTrackerConfigs(conf));
     long flushSize = conf.getLong(FLUSH_SIZE_KEY, DEFAULT_FLUSH_SIZE);
     long flushPerChanges = conf.getLong(FLUSH_PER_CHANGES_KEY, DEFAULT_FLUSH_PER_CHANGES);
     long flushIntervalMs = conf.getLong(FLUSH_INTERVAL_MS_KEY, DEFAULT_FLUSH_INTERVAL_MS);
